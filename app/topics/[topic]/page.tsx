@@ -7,6 +7,8 @@ import { getPost, BLOG_POSTS } from "@/lib/blog/posts";
 import { buildMetadata } from "@/lib/seo/metadata";
 import { WebPageJsonLd, BreadcrumbJsonLd } from "@/components/seo/json-ld";
 import { TrendingUp, ArrowRight, ExternalLink } from "lucide-react";
+import { SiteNav } from "@/components/layout/site-nav";
+import { SiteFooter } from "@/components/layout/site-footer";
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://subredify.io";
 
@@ -69,16 +71,7 @@ export default async function TopicPage({
       />
 
       <div className="min-h-screen bg-white">
-        <nav className="border-b border-border px-6 py-4">
-          <div className="max-w-5xl mx-auto flex items-center justify-between">
-            <Link href="/" className="font-semibold text-sm">Subredify</Link>
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <Link href="/blog" className="hover:text-foreground transition-colors">Blog</Link>
-              <Link href="/topics" className="hover:text-foreground transition-colors">Topics</Link>
-              <Link href="/signup" className="text-primary hover:underline">Get started →</Link>
-            </div>
-          </div>
-        </nav>
+        <SiteNav />
 
         <div className="max-w-5xl mx-auto px-6 py-12">
           {/* Breadcrumb */}
@@ -278,6 +271,7 @@ export default async function TopicPage({
             </div>
           </div>
         </div>
+        <SiteFooter />
       </div>
     </>
   );

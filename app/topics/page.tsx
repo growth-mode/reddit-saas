@@ -4,6 +4,8 @@ import { TOPIC_DATA } from "@/lib/seo/topics";
 import { buildMetadata } from "@/lib/seo/metadata";
 import { WebPageJsonLd } from "@/components/seo/json-ld";
 import { ArrowRight } from "lucide-react";
+import { SiteNav } from "@/components/layout/site-nav";
+import { SiteFooter } from "@/components/layout/site-footer";
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://subredify.io";
 
@@ -26,16 +28,7 @@ export default function TopicsPage() {
       />
 
       <div className="min-h-screen bg-white">
-        <nav className="border-b border-border px-6 py-4">
-          <div className="max-w-5xl mx-auto flex items-center justify-between">
-            <Link href="/" className="font-semibold text-sm">Subredify</Link>
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <Link href="/blog" className="hover:text-foreground transition-colors">Blog</Link>
-              <Link href="/topics" className="text-foreground font-medium">Topics</Link>
-              <Link href="/signup" className="text-primary hover:underline">Get started →</Link>
-            </div>
-          </div>
-        </nav>
+        <SiteNav />
 
         <div className="max-w-5xl mx-auto px-6 py-16">
           <div className="mb-12">
@@ -108,6 +101,7 @@ export default function TopicsPage() {
             </Link>
           </div>
         </div>
+        <SiteFooter />
       </div>
     </>
   );

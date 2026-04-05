@@ -1,0 +1,47 @@
+# Subredify
+
+> Subredify monitors Reddit for ICP (Ideal Customer Profile) conversations, scores threads for Google search rank probability, and generates subreddit-rule-compliant reply drafts for B2B SaaS founders, growth marketers, and agency owners.
+
+## What Subredify does
+
+Subredify scans Reddit communities hourly using Reddit's public .json API. Each post is scored with a Rank Opportunity Score (0–100) — a weighted composite of subreddit domain authority, comment velocity, upvote velocity, title searchability, thread age, and existing SERP presence. Posts are also classified for ICP relevance using Claude AI. When both scores are high, Subredify generates a reply draft that complies with each subreddit's specific rules.
+
+## Core features
+
+- **Hourly subreddit scanning** — monitors up to 20 subreddits (Growth plan) or unlimited (Pro plan)
+- **Rank Opportunity Score** — predicts which Reddit threads will rank on Google page 1
+- **ICP Classification** — identifies buying-intent signals: tool-seeking, frustration, comparison, decision-making, problem-statement, advice-seeking
+- **Rules engine** — parses subreddit rules, detects self-promotion policies, enforces compliance on every reply draft
+- **Reply drafts** — generates safe/borderline/avoid-rated reply drafts via Claude Sonnet
+- **Feed filtering** — filter by High Google Rank (score ≥70), High ICP (score ≥60), or High Opportunity (both)
+
+## Pricing
+
+- Free: 2 subreddits, 10 drafts/month, manual scan
+- Starter: $29/month — 5 subreddits, 100 drafts/month, hourly scan
+- Growth: $49/month — 20 subreddits, 500 drafts/month, 30-minute scan
+- Pro: $69/month — unlimited subreddits, unlimited drafts, 30-minute scan
+
+## Target users
+
+B2B SaaS founders, growth marketers, agency owners, and anyone who wants to be present in Reddit conversations that rank on Google.
+
+## Key pages
+
+- Homepage: https://subredify.io
+- Blog: https://subredify.io/blog
+- Pricing: https://subredify.io/pricing
+- About: https://subredify.io/about
+- Subreddit guides: https://subredify.io/r/[name]
+- Topic guides: https://subredify.io/topics/[topic]
+- Comparisons: https://subredify.io/compare/[slug]
+- Use cases: https://subredify.io/for/[audience]
+- Glossary: https://subredify.io/glossary
+
+## Technology
+
+Built with Next.js 16, Supabase, Anthropic Claude API (Haiku for ICP classification, Sonnet for reply generation), Stripe for billing. Deployed on Vercel.
+
+## Contact
+
+Website: https://subredify.io

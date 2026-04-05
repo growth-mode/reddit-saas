@@ -1,30 +1,47 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Layers, TrendingUp, Shield, MessageSquarePlus, Search } from "lucide-react";
+import { Layers, TrendingUp, Shield, MessageSquarePlus, Search, ArrowRight } from "lucide-react";
+import { SoftwareApplicationJsonLd, FAQJsonLd } from "@/components/seo/json-ld";
+import { BLOG_POSTS } from "@/lib/blog/posts";
+import { SiteNav } from "@/components/layout/site-nav";
+import { SiteFooter } from "@/components/layout/site-footer";
+
+const HOMEPAGE_FAQS = [
+  {
+    question: "What is Subredify?",
+    answer: "Subredify is a Reddit monitoring tool for B2B SaaS founders and marketers. It scans subreddits hourly for buying-intent conversations, scores each thread for Google rank probability, and generates rule-compliant reply drafts using Claude AI.",
+  },
+  {
+    question: "Why do Reddit threads rank on Google?",
+    answer: "Reddit has a domain authority of 91 — one of the highest on the internet. Google indexes threads from high-engagement subreddits within hours, and question-format titles match commercial search queries exactly. Reddit threads consistently appear in the top 5 Google results for product comparison, tool recommendation, and 'alternatives to X' queries.",
+  },
+  {
+    question: "How does the Rank Opportunity Score work?",
+    answer: "The Rank Opportunity Score (0–100) predicts whether a Reddit thread will rank on Google within 72 hours. It's a weighted composite of six signals: subreddit domain authority (25%), title searchability (20%), comment velocity (20%), upvote velocity (15%), thread age window (10%), and existing SERP presence (10%). Computed at ingest time — no AI API calls, no delay.",
+  },
+  {
+    question: "Will Subredify get my Reddit account banned?",
+    answer: "No. Subredify generates drafts for manual review — it never auto-posts. Every draft is risk-scored (safe/borderline/avoid) against the specific subreddit's rules before you see it. The rules engine parses each subreddit's actual rule text to detect self-promotion restrictions.",
+  },
+  {
+    question: "Which subreddits work best for B2B SaaS?",
+    answer: "r/entrepreneur (3.2M members, DA 85), r/SaaS (280K), r/startups (1.1M), r/sales (310K), and r/marketing (1.3M) have the highest concentration of B2B buyers and rank consistently for commercial queries. Subredify comes pre-configured with authority scores for 50+ subreddits.",
+  },
+  {
+    question: "Is there a free plan?",
+    answer: "Yes. The free plan includes 2 subreddits, 10 reply drafts per month, full Rank Opportunity scoring, ICP classification, and the subreddit rules engine. No credit card required.",
+  },
+];
 
 export default function LandingPage() {
+  const featuredPosts = BLOG_POSTS.slice(0, 3);
+
   return (
     <div className="min-h-screen bg-white">
-      {/* Nav */}
-      <nav className="border-b border-border px-6 py-4">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Layers className="h-4 w-4 text-primary" />
-            <span className="font-semibold text-sm">Subredify</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link href="/blog">
-              <Button variant="ghost" size="sm">Blog</Button>
-            </Link>
-            <Link href="/login">
-              <Button variant="ghost" size="sm">Sign in</Button>
-            </Link>
-            <Link href="/signup">
-              <Button size="sm">Get started</Button>
-            </Link>
-          </div>
-        </div>
-      </nav>
+      <SoftwareApplicationJsonLd />
+      <FAQJsonLd questions={HOMEPAGE_FAQS} />
+
+      <SiteNav />
 
       {/* Hero */}
       <div className="max-w-5xl mx-auto px-6 py-20">
@@ -119,8 +136,30 @@ export default function LandingPage() {
         </div>
       </div>
 
+      {/* Use cases */}
+      <div className="max-w-5xl mx-auto px-6 pb-16">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">Built for</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[
+            { label: "SaaS Founders", href: "/for/saas-founders", desc: "Find buyers in the subreddits they research in" },
+            { label: "Agencies", href: "/for/agencies", desc: "Scale Reddit ICP engagement across all clients" },
+            { label: "B2B Marketing", href: "/for/b2b-marketing", desc: "Be present where your buyers research tools" },
+            { label: "Growth Hackers", href: "/for/growth-hackers", desc: "Reddit ICP replies as a compounding SEO channel" },
+          ].map((uc) => (
+            <Link
+              key={uc.href}
+              href={uc.href}
+              className="border border-border rounded-lg p-4 hover:border-primary/40 transition-colors group"
+            >
+              <p className="text-xs font-semibold mb-1 group-hover:text-primary transition-colors">{uc.label}</p>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">{uc.desc}</p>
+            </Link>
+          ))}
+        </div>
+      </div>
+
       {/* Pricing */}
-      <div className="max-w-5xl mx-auto px-6 pb-24">
+      <div className="max-w-5xl mx-auto px-6 pb-16">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-6">Pricing</p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
@@ -150,22 +189,59 @@ export default function LandingPage() {
             </div>
           ))}
         </div>
-        <div className="mt-8 text-center">
+        <div className="mt-6 flex items-center gap-4">
           <Link href="/signup">
             <Button size="lg">Get started free →</Button>
+          </Link>
+          <Link href="/pricing" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+            See full pricing details →
           </Link>
         </div>
       </div>
 
-      <footer className="border-t border-border px-6 py-6">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Layers className="h-3.5 w-3.5 text-primary" />
-            <span className="text-xs font-semibold">Subredify</span>
-          </div>
-          <p className="text-xs text-muted-foreground">Reply early. Rank faster.</p>
+      {/* FAQ */}
+      <div className="max-w-5xl mx-auto px-6 pb-16">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-6">FAQ</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {HOMEPAGE_FAQS.map((faq, i) => (
+            <div key={i} className="border border-border rounded-lg p-4">
+              <p className="text-xs font-semibold mb-2">{faq.question}</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">{faq.answer}</p>
+            </div>
+          ))}
         </div>
-      </footer>
+      </div>
+
+      {/* Blog teaser */}
+      <div className="max-w-5xl mx-auto px-6 pb-24">
+        <div className="flex items-center justify-between mb-6">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">From the blog</p>
+          <Link href="/blog" className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+            All articles <ArrowRight className="h-3 w-3" />
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {featuredPosts.map((post) => (
+            <Link
+              key={post.slug}
+              href={`/blog/${post.slug}`}
+              className="border border-border rounded-lg p-4 hover:border-primary/40 transition-colors group"
+            >
+              <span className="text-[10px] text-muted-foreground bg-muted rounded px-1.5 py-0.5 mb-2 inline-block">
+                {post.category}
+              </span>
+              <h3 className="text-xs font-semibold group-hover:text-primary transition-colors leading-snug mt-1 mb-2">
+                {post.title}
+              </h3>
+              <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2">
+                {post.description}
+              </p>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      <SiteFooter />
     </div>
   );
 }

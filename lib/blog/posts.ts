@@ -19,6 +19,8 @@ export interface BlogPost {
   relatedSlugs: string[];
   relatedSubreddits: string[];
   relatedTopics: string[];
+  faqs?: { question: string; answer: string }[];
+  howToSteps?: { name: string; text: string }[];
 }
 
 export const BLOG_POSTS: BlogPost[] = [
@@ -33,6 +35,20 @@ export const BLOG_POSTS: BlogPost[] = [
     relatedSlugs: ["rank-opportunity-score-explained", "reply-early-rank-faster", "reddit-dominates-google-serp"],
     relatedSubreddits: ["entrepreneur", "SaaS", "startups"],
     relatedTopics: ["saas-marketing", "startup-growth-hacking"],
+    faqs: [
+      {
+        question: "Why do Reddit threads rank so highly on Google?",
+        answer: "Reddit has a domain authority of 91 — among the highest on the internet. Google trusts Reddit because of its massive inbound link profile, high engagement signals, and 20 years of authority-building. Threads with question-format titles also match commercial search queries exactly.",
+      },
+      {
+        question: "How quickly does Google index a Reddit thread?",
+        answer: "High-engagement subreddits like r/entrepreneur and r/SaaS get crawled within 1-4 hours of posting. Threads that sustain comment activity over 24-72 hours are more likely to achieve stable rankings.",
+      },
+      {
+        question: "What kind of Reddit threads rank on Google?",
+        answer: "Question-format titles ('What CRM do you use?', 'Best tool for X?'), threads in high-authority subreddits with 10,000+ subscribers, and posts that accumulate 10+ comments within the first 24 hours are most likely to rank on Google page 1.",
+      },
+    ],
     content: [
       {
         type: "paragraph",
@@ -126,6 +142,20 @@ export const BLOG_POSTS: BlogPost[] = [
     relatedSlugs: ["how-to-reply-reddit-without-getting-banned", "find-icp-on-reddit", "why-reddit-threads-rank-on-google"],
     relatedSubreddits: ["entrepreneur", "SaaS", "startups", "smallbusiness", "marketing"],
     relatedTopics: ["saas-marketing", "b2b-lead-generation", "startup-growth-hacking"],
+    faqs: [
+      {
+        question: "Which subreddit is best for SaaS founders?",
+        answer: "r/entrepreneur (3.2M members, DA 85) and r/SaaS (280K members) are the two highest-value subreddits for SaaS founders. r/entrepreneur has more buying-intent conversations; r/SaaS has a more technical, product-savvy audience who are often evaluating tools.",
+      },
+      {
+        question: "How do I find my ICP conversations on Reddit?",
+        answer: "Search for pain-point keywords ('frustrating', 'looking for', 'alternatives to') within your target subreddits. Filter by 'new' to catch threads before they're saturated. Tools like Subredify automate this — scanning hourly for buying-intent signals and scoring each thread.",
+      },
+      {
+        question: "Can I promote my SaaS on Reddit without getting banned?",
+        answer: "Yes, but carefully. Most subreddits prohibit direct self-promotion, but allow genuine value-add replies that mention products contextually. Always read the subreddit rules first, provide real advice, and only mention your product when directly relevant to the question.",
+      },
+    ],
     content: [
       {
         type: "paragraph",
@@ -241,6 +271,23 @@ export const BLOG_POSTS: BlogPost[] = [
     relatedSlugs: ["best-subreddits-for-saas-founders", "how-to-reply-reddit-without-getting-banned", "b2b-saas-reddit-playbook"],
     relatedSubreddits: ["entrepreneur", "SaaS", "startups", "sales"],
     relatedTopics: ["b2b-lead-generation", "saas-marketing"],
+    faqs: [
+      {
+        question: "What is an ICP conversation on Reddit?",
+        answer: "An ICP (Ideal Customer Profile) conversation is a Reddit thread where someone matching your target customer is actively discussing a problem your product solves. Signals include: asking for tool recommendations, expressing frustration with a current solution, comparing alternatives, or describing a pain point your product addresses.",
+      },
+      {
+        question: "How do I identify buying intent on Reddit?",
+        answer: "Look for six signal types: tool_seeking ('what do you use for X'), frustration ('sick of Y, need something better'), comparison ('X vs Y'), decision_making ('about to sign up for Z, worth it?'), problem_statement ('struggling with W'), and advice_seeking ('how do you handle V'). The first three have the highest conversion potential.",
+      },
+    ],
+    howToSteps: [
+      { name: "Define your ICP keywords", text: "List the pain points, job titles, and tool categories your ICP cares about. Include competitor names and your category keywords." },
+      { name: "Choose target subreddits", text: "Identify 3-5 subreddits where your ICP congregates. Focus on communities with 50K+ subscribers and recent activity." },
+      { name: "Filter for buying-intent signals", text: "Search for threads using signal keywords: 'looking for', 'alternatives to', 'recommend', 'frustrated with'. Sort by New to find fresh opportunities." },
+      { name: "Score threads for Google rank potential", text: "Check thread age (2-72 hours is ideal), comment velocity, and subreddit authority. High-scoring threads are worth prioritizing." },
+      { name: "Draft a compliant reply", text: "Write a reply that provides genuine value first. Only mention your product if it directly answers the question and subreddit rules permit it." },
+    ],
     content: [
       {
         type: "paragraph",
@@ -331,6 +378,27 @@ export const BLOG_POSTS: BlogPost[] = [
     relatedSlugs: ["subreddit-rules-decoded", "best-subreddits-for-saas-founders", "b2b-saas-reddit-playbook"],
     relatedSubreddits: ["entrepreneur", "marketing", "startups"],
     relatedTopics: ["saas-marketing", "content-marketing"],
+    faqs: [
+      {
+        question: "Will replying on Reddit get my account banned?",
+        answer: "Not if you follow the subreddit rules. Each subreddit has unique rules about self-promotion. The key is to provide genuine value first and only mention your product when it's directly relevant. Tools like Subredify parse subreddit rules and score every reply draft before you post.",
+      },
+      {
+        question: "What are the riskiest subreddits for self-promotion?",
+        answer: "r/SaaS, r/marketing, and r/sales have explicit no-self-promotion rules. r/entrepreneur and r/startups have softer rules but active moderators. Always check a subreddit's rules sidebar before posting any reply that mentions your product.",
+      },
+      {
+        question: "How do I reply on Reddit without sounding like a bot?",
+        answer: "Match the subreddit's tone (casual in r/entrepreneur, technical in r/devops), answer the specific question asked, share personal experience or data where possible, and mention your product as a footnote rather than the lead. Never use marketing language or calls-to-action.",
+      },
+    ],
+    howToSteps: [
+      { name: "Read the subreddit rules", text: "Navigate to the subreddit sidebar and read all rules before posting. Look specifically for any rules about self-promotion, affiliate links, or advertising." },
+      { name: "Check if the thread is a fit", text: "Only reply to threads where you can provide genuine value. Ask: 'Would I write this reply even if I had no product to promote?'" },
+      { name: "Write the value layer first", text: "Open your reply with actionable advice that answers the question directly. This should be 80% of your reply." },
+      { name: "Add product context carefully", text: "If your product is genuinely relevant, mention it briefly in the last paragraph. Frame it as 'I built something for this' rather than 'check out my product'." },
+      { name: "Review against subreddit rules", text: "Re-read your reply through the lens of the subreddit rules. If any moderator would flag it, revise or remove the product mention." },
+    ],
     content: [
       {
         type: "paragraph",
@@ -419,6 +487,16 @@ export const BLOG_POSTS: BlogPost[] = [
     relatedSlugs: ["why-reddit-threads-rank-on-google", "rank-opportunity-score-explained", "reply-early-rank-faster"],
     relatedSubreddits: ["SEO", "marketing", "technology"],
     relatedTopics: ["saas-marketing", "content-marketing"],
+    faqs: [
+      {
+        question: "Why does Reddit appear in so many Google searches?",
+        answer: "Reddit's domain authority of 91, combined with its massive volume of user-generated content covering nearly every topic, means Google treats Reddit as one of the most trusted sources on the internet. Reddit threads also naturally match the question-format queries users type into Google.",
+      },
+      {
+        question: "Has Reddit's Google presence grown recently?",
+        answer: "Yes. After Google's 2024 Helpful Content updates, Reddit's visibility in search results increased significantly as Google rewarded authentic user discussions over optimized editorial content. Reddit threads now appear in top 5 results for the majority of 'best X' and 'X vs Y' commercial queries.",
+      },
+    ],
     content: [
       {
         type: "paragraph",
@@ -492,6 +570,20 @@ export const BLOG_POSTS: BlogPost[] = [
     relatedSlugs: ["why-reddit-threads-rank-on-google", "reddit-dominates-google-serp", "reply-early-rank-faster"],
     relatedSubreddits: ["entrepreneur", "SaaS"],
     relatedTopics: ["saas-marketing", "startup-growth-hacking"],
+    faqs: [
+      {
+        question: "What is the Rank Opportunity Score?",
+        answer: "The Rank Opportunity Score (0-100) is a weighted composite that predicts whether a Reddit thread will rank on Google within 72 hours. It combines six signals: subreddit domain authority (25%), title searchability (20%), comment velocity (20%), upvote velocity (15%), thread age window (10%), and existing SERP presence (10%).",
+      },
+      {
+        question: "What score means a thread will definitely rank?",
+        answer: "There's no guarantee, but threads scoring 75+ have a high probability of appearing in Google top 10 within 72 hours. Scores of 50-74 are worth monitoring. Below 50, the thread is unlikely to rank in the near term.",
+      },
+      {
+        question: "Does Subredify's scoring use AI?",
+        answer: "No — the Rank Opportunity Score is computed deterministically at ingest time using measurable signals (subscriber counts, timestamps, comment rates). No AI API calls are made for scoring, which keeps it fast and cost-efficient.",
+      },
+    ],
     content: [
       {
         type: "paragraph",
@@ -565,6 +657,16 @@ export const BLOG_POSTS: BlogPost[] = [
     relatedSlugs: ["why-reddit-threads-rank-on-google", "rank-opportunity-score-explained", "how-to-reply-reddit-without-getting-banned"],
     relatedSubreddits: ["entrepreneur", "SaaS", "startups", "marketing"],
     relatedTopics: ["saas-marketing", "startup-growth-hacking"],
+    faqs: [
+      {
+        question: "What is the reply window for Reddit SEO?",
+        answer: "The optimal window to reply is within 2-24 hours of a thread being posted. Threads in this window are actively accumulating comments and upvotes (which Google uses as quality signals), and you have a higher chance of landing near the top of the thread before it gets saturated.",
+      },
+      {
+        question: "How much does being an early reply on Reddit actually help SEO?",
+        answer: "Early replies benefit from higher thread positioning (Google crawlers often index the first 10-15 comments), citation in other sites that link to the thread, and association with the thread's keyword signals as the thread ages and gains rankings.",
+      },
+    ],
     content: [
       {
         type: "paragraph",
@@ -637,6 +739,27 @@ export const BLOG_POSTS: BlogPost[] = [
     relatedSlugs: ["find-icp-on-reddit", "how-to-reply-reddit-without-getting-banned", "best-subreddits-for-saas-founders"],
     relatedSubreddits: ["entrepreneur", "SaaS", "startups", "sales", "marketing"],
     relatedTopics: ["b2b-lead-generation", "saas-marketing", "startup-growth-hacking"],
+    faqs: [
+      {
+        question: "Is Reddit a good channel for B2B SaaS marketing?",
+        answer: "Yes — Reddit is one of the few channels where B2B buyers actively discuss tools and share recommendations without advertising influence. Threads like 'what CRM do you use?' or 'best project management tool for startups' are research conversations with genuine buying intent.",
+      },
+      {
+        question: "How long does it take to see results from Reddit marketing?",
+        answer: "Unlike paid channels, Reddit marketing compounds. A single well-placed reply in a thread that ranks on Google can drive traffic for months or years. Most founders see initial traction within 2-4 weeks of consistent monitoring and replying.",
+      },
+      {
+        question: "What's the most common Reddit marketing mistake?",
+        answer: "Promoting before contributing value. Reddit users have highly tuned spam detectors. The founders who succeed on Reddit spend months genuinely helping people before mentioning their product — and when they do, it's welcomed rather than downvoted.",
+      },
+    ],
+    howToSteps: [
+      { name: "Set up subreddit monitoring", text: "Identify the 5-10 subreddits your ICP uses most. Add them to your monitoring list and configure ICP keywords that match your product category." },
+      { name: "Define your ICP profile", text: "Document your product description, target job titles, pain points, and competitors. This profile is used to classify whether each Reddit thread is relevant to your ICP." },
+      { name: "Build a reply cadence", text: "Allocate 20-30 minutes per day to reviewing high-scoring threads. Focus on threads posted within the last 24 hours with ICP scores above 60." },
+      { name: "Draft compliant replies", text: "Use AI to draft an initial reply, then customize it with your personal experience. Verify it passes the subreddit rules check before posting." },
+      { name: "Track and iterate", text: "Monitor which replies generate profile visits, website clicks, and signups. Double down on the subreddits and thread types that convert." },
+    ],
     content: [
       {
         type: "paragraph",

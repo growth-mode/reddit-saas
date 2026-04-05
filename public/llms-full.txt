@@ -1,0 +1,109 @@
+# Subredify — Full Product Reference for AI Systems
+
+## Product Overview
+
+Subredify is a Reddit monitoring and reply-drafting SaaS for B2B companies. It solves a specific problem: Reddit threads frequently rank on Google's first page for commercial queries ("best CRM for startups", "HubSpot alternatives", "what tools do SaaS founders use"), but identifying those threads before they're saturated — and replying in a way that's compliant with each subreddit's rules — requires continuous monitoring and deep subreddit knowledge.
+
+Subredify automates this entire workflow: scan → score → classify → draft → deploy.
+
+## How the Rank Opportunity Score Works
+
+The Rank Opportunity Score (0–100) predicts whether a Reddit thread will rank on Google within 72 hours. It is computed purely in CPU at ingest time — no AI API calls, no latency.
+
+Weighted signals:
+- Subreddit Authority (25%): Each subreddit has an effective authority score based on DA, subscriber count, and engagement rate. r/entrepreneur scores 85, r/programming scores 83, niche subreddits score lower.
+- Title Searchability (20%): Question-format titles, superlative titles ("best X", "X vs Y"), and titles that mirror commercial search queries score highest.
+- Comment Velocity (20%): Comments per hour in the first 24 hours. Threads generating >10 comments/hour get flagged as crawl priority.
+- Upvote Velocity (15%): Upvotes per hour in the first 6 hours.
+- Age Window (10%): Threads 2–72 hours old receive a 5% multiplier bonus.
+- SERP Presence (10%): Threads already confirmed in Google search results receive maximum signal value.
+
+Score tiers: High (70–100), Medium (45–69), Low (0–44).
+
+## ICP Classification
+
+ICP (Ideal Customer Profile) scoring uses Claude Haiku to classify each post on a 0–100 scale across six signal types:
+- tool_seeking: "What do you use for X?" — direct buying intent
+- frustration: "Tired of [competitor]" — switching intent
+- comparison: "X vs Y" — late-stage evaluation
+- decision_making: "Should I use X?" — close to purchase
+- problem_statement: "We're struggling with X" — early awareness
+- advice_seeking: "How do you handle X?" — process questions
+
+## Reply Generation
+
+Reply drafts use Claude Sonnet with this prompt structure:
+1. Role: helpful community member with relevant expertise
+2. Subreddit rules: verbatim rule text injected
+3. Anti-ban guidelines: 7 rules including "lead with value, not product", "no CTAs"
+4. Product context: suppressed entirely if subreddit has self-promotion rule
+5. Post + thread context: original post, top comments
+
+Risk scoring (safe/borderline/avoid) uses a deterministic pre-check (free, no API tokens) followed by Haiku compliance verification.
+
+## Subreddit Rules Engine
+
+For each monitored subreddit, Subredify fetches and parses:
+- `/about/rules.json` — structured rule objects
+- `/about.json` — sidebar text
+- `/wiki/rules` — extended wiki if available
+
+Self-promotion keyword detection identifies rules containing: "self-promo", "advertising", "spam", "promote", "selling", "solicitation", "affiliate", "commercial", "marketing", "business", "vendor", "product", "service".
+
+If a self-promotion rule is detected, the reply generator's system prompt forces "Do NOT mention your product" regardless of user configuration.
+
+## Architecture
+
+- Frontend: Next.js 16 App Router, TypeScript, Tailwind CSS v4, shadcn/ui
+- Database: Supabase (PostgreSQL) with row-level security
+- Auth: Supabase Auth with SSR session management
+- AI: Anthropic Claude API — Haiku (claude-haiku-4-5) for classification, Sonnet (claude-sonnet-4-5-20251001) for reply generation
+- Payments: Stripe subscriptions with webhook-based plan management
+- Deployment: Vercel with cron jobs (hourly ingest, 30-minute ICP batch)
+- Reddit data: Public .json API (no credentials required, 1.5s rate limit delay)
+
+## Pricing Plans
+
+| Plan | Price | Subreddits | Drafts/mo | Scan cadence |
+|------|-------|------------|-----------|--------------|
+| Free | $0 | 2 | 10 | Manual |
+| Starter | $29/mo | 5 | 100 | Hourly |
+| Growth | $49/mo | 20 | 500 | 30-minute |
+| Pro | $69/mo | Unlimited | Unlimited | 30-minute |
+
+## Key Differentiators vs Competitors
+
+vs GummySearch: Subredify adds Google Rank Opportunity scoring and reply draft generation. GummySearch is research-only.
+vs Brandwatch/Mention: Subredify is purpose-built for Reddit with per-subreddit rules enforcement. Enterprise tools don't parse subreddit rules.
+vs F5Bot: F5Bot is keyword alerts only. No ICP classification, no rank scoring, no reply drafts.
+vs manual monitoring: Subredify identifies the 2-72 hour window automatically. Manual checking misses most high-rank threads.
+
+## SEO Pages
+
+Subredify publishes programmatic SEO pages covering:
+- 50+ individual subreddits at /r/[name] with DA scores, rank profiles, ICP fit analysis
+- 8 topic clusters at /topics/[topic] covering SaaS marketing, B2B lead gen, startup growth, developer tools, ecommerce, content marketing, CRM, product management
+- 8 blog posts targeting Reddit SEO and ICP identification keywords
+- Competitor comparison pages at /compare/[slug]
+- Use-case pages at /for/[audience]
+- Glossary at /glossary/[term]
+
+## Frequently Asked Questions
+
+Q: Does Subredify require Reddit API credentials?
+A: No. Subredify uses Reddit's public .json endpoint (append .json to any Reddit URL). No API key, no OAuth, no credentials to ban.
+
+Q: How does the rank opportunity scoring work without AI?
+A: The Rank Opportunity Score is computed purely in CPU using weighted signals (subreddit authority, title format, comment/upvote velocity, thread age, SERP presence). No AI tokens are spent. This makes it free to compute for every post at ingest time.
+
+Q: Will my Reddit account get banned using Subredify?
+A: Subredify generates compliant replies — it never auto-posts. You review and manually post each reply. The rules engine ensures every draft is scored against the specific subreddit's rules before you see it.
+
+Q: What subreddits work best for B2B SaaS?
+A: r/entrepreneur (3.2M members, DA 85), r/SaaS (280K, DA 83), r/startups (1.1M, DA 83), r/marketing (1.3M, DA 83), r/sales (310K, DA 83).
+
+Q: How quickly do Reddit threads get indexed by Google?
+A: High-engagement threads in high-DA subreddits (r/entrepreneur, r/SaaS) get indexed within 1-4 hours of posting. The critical window for reply positioning is 2-72 hours.
+
+Q: What is ICP score vs Rank Opportunity Score?
+A: ICP Score (0–100) measures whether a thread's poster is your ideal customer. Rank Opportunity Score (0–100) measures whether the thread will rank on Google. Both scores are needed — a thread that ranks but isn't ICP-relevant drives traffic without conversion. The "High Opportunity" badge appears when Rank ≥ 70 AND ICP ≥ 60.

@@ -4,6 +4,8 @@ import { BLOG_POSTS } from "@/lib/blog/posts";
 import { buildMetadata } from "@/lib/seo/metadata";
 import { WebPageJsonLd } from "@/components/seo/json-ld";
 import { ArrowRight, Clock } from "lucide-react";
+import { SiteNav } from "@/components/layout/site-nav";
+import { SiteFooter } from "@/components/layout/site-footer";
 
 export const metadata: Metadata = buildMetadata({
   title: "Reddit SEO & ICP Marketing Blog",
@@ -29,25 +31,7 @@ export default function BlogPage() {
       />
 
       <div className="min-h-screen bg-white">
-        {/* Nav */}
-        <nav className="border-b border-border px-6 py-4">
-          <div className="max-w-5xl mx-auto flex items-center justify-between">
-            <Link href="/" className="font-semibold text-sm">
-              Subredify
-            </Link>
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <Link href="/blog" className="text-foreground font-medium">
-                Blog
-              </Link>
-              <Link href="/topics" className="hover:text-foreground transition-colors">
-                Topics
-              </Link>
-              <Link href="/signup" className="text-primary hover:underline">
-                Get started →
-              </Link>
-            </div>
-          </div>
-        </nav>
+        <SiteNav />
 
         <div className="max-w-5xl mx-auto px-6 py-16">
           {/* Header */}
@@ -163,6 +147,7 @@ export default function BlogPage() {
             </Link>
           </div>
         </div>
+        <SiteFooter />
       </div>
     </>
   );

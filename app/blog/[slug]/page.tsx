@@ -8,8 +8,10 @@ import {
   type ContentBlock,
 } from "@/lib/blog/posts";
 import { buildArticleMetadata } from "@/lib/seo/metadata";
-import { ArticleJsonLd, BreadcrumbJsonLd } from "@/components/seo/json-ld";
+import { ArticleJsonLd, BreadcrumbJsonLd, FAQJsonLd, HowToJsonLd } from "@/components/seo/json-ld";
 import { ArrowLeft, Clock, ArrowRight } from "lucide-react";
+import { SiteNav } from "@/components/layout/site-nav";
+import { SiteFooter } from "@/components/layout/site-footer";
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://subredify.io";
 
@@ -120,24 +122,19 @@ export default async function BlogPostPage({
           { name: post.title, url: postUrl },
         ]}
       />
+      {post.faqs && post.faqs.length > 0 && (
+        <FAQJsonLd questions={post.faqs} />
+      )}
+      {post.howToSteps && post.howToSteps.length > 0 && (
+        <HowToJsonLd
+          name={post.title}
+          description={post.description}
+          steps={post.howToSteps}
+        />
+      )}
 
       <div className="min-h-screen bg-white">
-        {/* Nav */}
-        <nav className="border-b border-border px-6 py-4">
-          <div className="max-w-5xl mx-auto flex items-center justify-between">
-            <Link href="/" className="font-semibold text-sm">
-              Subredify
-            </Link>
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <Link href="/blog" className="hover:text-foreground transition-colors">
-                Blog
-              </Link>
-              <Link href="/signup" className="text-primary hover:underline">
-                Get started →
-              </Link>
-            </div>
-          </div>
-        </nav>
+        <SiteNav />
 
         <div className="max-w-5xl mx-auto px-6 py-12">
           <div className="max-w-2xl">
@@ -196,6 +193,23 @@ export default async function BlogPostPage({
                 <ContentRenderer key={i} block={block} />
               ))}
             </article>
+
+            {/* FAQ section */}
+            {post.faqs && post.faqs.length > 0 && (
+              <div className="border border-border rounded-lg p-5 mb-8">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">
+                  Frequently Asked Questions
+                </p>
+                <div className="space-y-4">
+                  {post.faqs.map((faq, i) => (
+                    <div key={i} className="border-b border-border last:border-0 pb-4 last:pb-0">
+                      <p className="text-xs font-semibold mb-1.5">{faq.question}</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">{faq.answer}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Related subreddits */}
             {post.relatedSubreddits.length > 0 && (
@@ -292,6 +306,7 @@ export default async function BlogPostPage({
             </div>
           )}
         </div>
+        <SiteFooter />
       </div>
     </>
   );
