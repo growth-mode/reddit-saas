@@ -6,7 +6,7 @@ import { CheckCircle, ArrowRight } from "lucide-react";
 import { SiteNav } from "@/components/layout/site-nav";
 import { SiteFooter } from "@/components/layout/site-footer";
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://www.subredify.io";
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://www.subredify.com";
 
 export const metadata: Metadata = buildMetadata({
   title: "Pricing — Free, Starter $29, Growth $49, Pro $69",
@@ -96,7 +96,7 @@ const FAQS = [
   { question: "Can I change plans anytime?", answer: "Yes. Upgrade or downgrade anytime through the billing dashboard. Upgrades take effect immediately. Downgrades apply at the next billing cycle." },
   { question: "What counts as a 'reply draft'?", answer: "A reply draft is a Claude Sonnet-generated reply created for a specific Reddit thread. Each time you click 'Generate draft' for a post, that uses one draft from your monthly allowance." },
   { question: "Is the subreddit rules engine included on all plans?", answer: "Yes. The rules engine is included on every plan — it's core to the product. Every draft is risk-scored safe/borderline/avoid regardless of plan tier." },
-  { question: "Do you offer annual pricing?", answer: "Annual pricing with a discount is coming soon. Subscribe to updates at subredify.io." },
+  { question: "Do you offer annual pricing?", answer: "Annual pricing with a discount is coming soon. Subscribe to updates at subredify.com." },
 ];
 
 export default function PricingPage() {
@@ -117,7 +117,7 @@ export default function PricingPage() {
             name: "Subredify",
             applicationCategory: "BusinessApplication",
             operatingSystem: "Web",
-            url: "https://www.subredify.io",
+            url: "https://www.subredify.com",
             description: "Reddit monitoring SaaS that scores threads for Google rank potential and generates rule-compliant reply drafts.",
             offers: PLANS.map((p) => ({
               "@type": "Offer",

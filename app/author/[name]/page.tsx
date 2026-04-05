@@ -9,7 +9,7 @@ import { Clock, ArrowRight } from "lucide-react";
 import { SiteNav } from "@/components/layout/site-nav";
 import { SiteFooter } from "@/components/layout/site-footer";
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://www.subredify.io";
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://www.subredify.com";
 
 export async function generateStaticParams() {
   return getAllAuthorSlugs().map((name) => ({ name }));
@@ -50,7 +50,7 @@ export default async function AuthorPage({ params }: { params: Promise<{ name: s
             worksFor: {
               "@type": "Organization",
               name: "Subredify",
-              url: "https://www.subredify.io",
+              url: "https://www.subredify.com",
             },
             knowsAbout: author.expertise,
             ...(author.twitterHandle && {

@@ -28,15 +28,15 @@ B2B SaaS founders, growth marketers, agency owners, and anyone who wants to be p
 
 ## Key pages
 
-- Homepage: https://subredify.io
-- Blog: https://subredify.io/blog
-- Pricing: https://subredify.io/pricing
-- About: https://subredify.io/about
-- Subreddit guides: https://subredify.io/r/[name]
-- Topic guides: https://subredify.io/topics/[topic]
-- Comparisons: https://subredify.io/compare/[slug]
-- Use cases: https://subredify.io/for/[audience]
-- Glossary: https://subredify.io/glossary
+- Homepage: https://subredify.com
+- Blog: https://subredify.com/blog
+- Pricing: https://subredify.com/pricing
+- About: https://subredify.com/about
+- Subreddit guides: https://subredify.com/r/[name]
+- Topic guides: https://subredify.com/topics/[topic]
+- Comparisons: https://subredify.com/compare/[slug]
+- Use cases: https://subredify.com/for/[audience]
+- Glossary: https://subredify.com/glossary
 
 ## Technology
 
@@ -44,4 +44,4 @@ Built with Next.js 16, Supabase, Anthropic Claude API (Haiku for ICP classificat
 
 ## Contact
 
-Website: https://subredify.io
+Website: https://subredify.com

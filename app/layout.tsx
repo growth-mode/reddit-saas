@@ -8,7 +8,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://www.subredify.io";
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://www.subredify.com";
 
 export const metadata: Metadata = {
   title: {

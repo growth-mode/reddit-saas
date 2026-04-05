@@ -14,7 +14,7 @@ export const metadata: Metadata = buildMetadata({
   path: "/blog",
 });
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://www.subredify.io";
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://www.subredify.com";
 
 const CATEGORIES = Array.from(new Set(BLOG_POSTS.map((p) => p.category)));
 

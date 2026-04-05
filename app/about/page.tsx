@@ -6,7 +6,7 @@ import { Layers, TrendingUp, Shield, Users } from "lucide-react";
 import { SiteNav } from "@/components/layout/site-nav";
 import { SiteFooter } from "@/components/layout/site-footer";
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://www.subredify.io";
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://www.subredify.com";
 
 export const metadata: Metadata = buildMetadata({
   title: "About Subredify",
@@ -29,7 +29,7 @@ export default function AboutPage() {
             "@context": "https://schema.org",
             "@type": "Organization",
             name: "Subredify",
-            url: "https://www.subredify.io",
+            url: "https://www.subredify.com",
             description: "Reddit ICP monitoring SaaS that scores threads for Google rank potential and generates rule-compliant reply drafts.",
             foundingDate: "2025",
             knowsAbout: [

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://www.subredify.io";
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://www.subredify.com";
 const SITE_NAME = "Subredify";
 const DEFAULT_DESCRIPTION =
   "Monitor Reddit for ICP conversations, score threads for Google rank potential, and generate rule-compliant reply drafts.";

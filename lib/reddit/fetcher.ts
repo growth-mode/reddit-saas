@@ -5,7 +5,7 @@
 import type { RedditComment } from "@/lib/supabase/types";
 
 const DELAY_MS = 1500;
-const USER_AGENT = "Subredify/1.0 (+https://subredify.io)";
+const USER_AGENT = "Subredify/1.0 (+https://subredify.com)";
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));

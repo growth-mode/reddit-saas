@@ -95,7 +95,7 @@ export default async function Image({ params }: { params: { slug: string } }) {
                 background: "#ff4500",
               }}
             />
-            <span style={{ fontSize: "14px", color: "#6b7280" }}>subredify.io/blog</span>
+            <span style={{ fontSize: "14px", color: "#6b7280" }}>subredify.com/blog</span>
           </div>
           <span style={{ fontSize: "14px", color: "#d1d5db" }}>·</span>
           <span style={{ fontSize: "14px", color: "#6b7280" }}>{readingTime} min read</span>
