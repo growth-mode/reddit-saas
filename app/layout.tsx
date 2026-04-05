@@ -9,7 +9,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "RedditMonitor — Find ICP Conversations on Reddit",
+  title: "Subredify — Find ICP Conversations on Reddit",
   description: "Monitor Reddit for buying signals and generate rule-compliant replies.",
 };
 

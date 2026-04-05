@@ -28,7 +28,7 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
   },
   growth: {
     name: "Growth",
-    price: "$79/mo",
+    price: "$49/mo",
     subreddits: 20,
     draftsPerMonth: 500,
     scanCadence: "30min",
@@ -36,7 +36,7 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
   },
   pro: {
     name: "Pro",
-    price: "$149/mo",
+    price: "$69/mo",
     subreddits: -1,
     draftsPerMonth: -1,
     scanCadence: "30min",

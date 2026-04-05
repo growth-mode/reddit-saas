@@ -48,7 +48,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="px-4 py-5 border-b border-border">
           <Link href="/feed" className="flex items-center gap-2">
             <Layers className="h-4 w-4 text-primary" />
-            <span className="font-semibold text-sm">RedditMonitor</span>
+            <span className="font-semibold text-sm">Subredify</span>
           </Link>
         </div>
 

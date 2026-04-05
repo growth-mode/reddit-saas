@@ -33,7 +33,7 @@ export default function LoginPage() {
     <div className="w-full max-w-sm">
       <div className="mb-8">
         <div className="flex items-center gap-2 mb-6">
-          <span className="text-primary font-semibold text-lg">RedditMonitor</span>
+          <span className="text-primary font-semibold text-lg">Subredify</span>
         </div>
         <h1 className="text-xl font-semibold">Sign in</h1>
         <p className="text-sm text-muted-foreground mt-1">Enter your credentials to continue</p>

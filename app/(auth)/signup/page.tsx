@@ -34,7 +34,7 @@ export default function SignupPage() {
   if (done) {
     return (
       <div className="w-full max-w-sm text-center">
-        <div className="text-primary font-semibold text-lg mb-6">RedditMonitor</div>
+        <div className="text-primary font-semibold text-lg mb-6">Subredify</div>
         <h1 className="text-xl font-semibold">Check your email</h1>
         <p className="text-sm text-muted-foreground mt-2">
           We sent a confirmation link to <strong>{email}</strong>.
@@ -47,7 +47,7 @@ export default function SignupPage() {
     <div className="w-full max-w-sm">
       <div className="mb-8">
         <div className="flex items-center gap-2 mb-6">
-          <span className="text-primary font-semibold text-lg">RedditMonitor</span>
+          <span className="text-primary font-semibold text-lg">Subredify</span>
         </div>
         <h1 className="text-xl font-semibold">Create account</h1>
         <p className="text-sm text-muted-foreground mt-1">Start monitoring Reddit for free</p>

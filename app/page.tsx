@@ -10,9 +10,12 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Layers className="h-4 w-4 text-primary" />
-            <span className="font-semibold text-sm">RedditMonitor</span>
+            <span className="font-semibold text-sm">Subredify</span>
           </div>
           <div className="flex items-center gap-3">
+            <Link href="/blog">
+              <Button variant="ghost" size="sm">Blog</Button>
+            </Link>
             <Link href="/login">
               <Button variant="ghost" size="sm">Sign in</Button>
             </Link>
@@ -123,8 +126,8 @@ export default function LandingPage() {
           {[
             { name: "Free", price: "$0", subs: "2 subreddits", drafts: "10 drafts/mo", cadence: "Manual scan" },
             { name: "Starter", price: "$29/mo", subs: "5 subreddits", drafts: "100 drafts/mo", cadence: "Hourly scan", highlight: true },
-            { name: "Growth", price: "$79/mo", subs: "20 subreddits", drafts: "500 drafts/mo", cadence: "30-min scan" },
-            { name: "Pro", price: "$149/mo", subs: "Unlimited", drafts: "Unlimited", cadence: "30-min scan" },
+            { name: "Growth", price: "$49/mo", subs: "20 subreddits", drafts: "500 drafts/mo", cadence: "30-min scan" },
+            { name: "Pro", price: "$69/mo", subs: "Unlimited", drafts: "Unlimited", cadence: "30-min scan" },
           ].map((p) => (
             <div
               key={p.name}
@@ -158,7 +161,7 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Layers className="h-3.5 w-3.5 text-primary" />
-            <span className="text-xs font-semibold">RedditMonitor</span>
+            <span className="text-xs font-semibold">Subredify</span>
           </div>
           <p className="text-xs text-muted-foreground">Reply early. Rank faster.</p>
         </div>
