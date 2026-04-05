@@ -24,12 +24,12 @@ export function ArticleJsonLd({
     author: {
       "@type": "Organization",
       name: authorName,
-      url: "https://subredify.io",
+      url: "https://www.subredify.io",
     },
     publisher: {
       "@type": "Organization",
       name: "Subredify",
-      url: "https://subredify.io",
+      url: "https://www.subredify.io",
     },
   };
 
@@ -83,7 +83,7 @@ export function WebPageJsonLd({
     publisher: {
       "@type": "Organization",
       name: "Subredify",
-      url: "https://subredify.io",
+      url: "https://www.subredify.io",
     },
   };
 
@@ -102,7 +102,7 @@ export function SoftwareApplicationJsonLd() {
     name: "Subredify",
     applicationCategory: "BusinessApplication",
     operatingSystem: "Web",
-    url: "https://subredify.io",
+    url: "https://www.subredify.io",
     description:
       "Reddit monitoring SaaS that scores threads for Google rank potential, classifies ICP buying intent, and generates subreddit-rule-compliant reply drafts.",
     offers: [

@@ -7,7 +7,7 @@ import { ArrowRight } from "lucide-react";
 import { SiteNav } from "@/components/layout/site-nav";
 import { SiteFooter } from "@/components/layout/site-footer";
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://subredify.io";
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://www.subredify.io";
 
 export const metadata: Metadata = buildMetadata({
   title: "Reddit SEO Glossary — ICP, Rank Scoring & Subreddit Terms",

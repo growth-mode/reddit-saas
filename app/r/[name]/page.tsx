@@ -12,7 +12,7 @@ import { TrendingUp, ExternalLink, ArrowRight } from "lucide-react";
 import { SiteNav } from "@/components/layout/site-nav";
 import { SiteFooter } from "@/components/layout/site-footer";
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://subredify.io";
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://www.subredify.io";
 
 export async function generateStaticParams() {
   return getAllSubredditNames().map((name) => ({ name }));

@@ -7,7 +7,7 @@ import { getAllGlossarySlugs } from "@/lib/seo/glossary";
 import { getAllAudiences } from "@/lib/seo/use-cases";
 import { getAllAuthorSlugs } from "@/lib/seo/authors";
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://subredify.io";
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://www.subredify.io";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();

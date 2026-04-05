@@ -6,7 +6,7 @@ import { CheckCircle, ArrowRight } from "lucide-react";
 import { SiteNav } from "@/components/layout/site-nav";
 import { SiteFooter } from "@/components/layout/site-footer";
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://subredify.io";
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://www.subredify.io";
 
 export const metadata: Metadata = buildMetadata({
   title: "Pricing — Free, Starter $29, Growth $49, Pro $69",
@@ -117,7 +117,7 @@ export default function PricingPage() {
             name: "Subredify",
             applicationCategory: "BusinessApplication",
             operatingSystem: "Web",
-            url: "https://subredify.io",
+            url: "https://www.subredify.io",
             description: "Reddit monitoring SaaS that scores threads for Google rank potential and generates rule-compliant reply drafts.",
             offers: PLANS.map((p) => ({
               "@type": "Offer",
