@@ -71,6 +71,19 @@ export default async function FeedPage() {
             <a href="/subreddits" className="text-primary hover:underline">Add a subreddit</a> to start seeing opportunities.
           </p>
         </div>
+      ) : posts.length === 0 ? (
+        <div className="border border-dashed border-border rounded-lg p-10 text-center space-y-2">
+          <div className="flex justify-center mb-3">
+            <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          </div>
+          <p className="text-sm font-medium">Scanning Reddit for opportunities...</p>
+          <p className="text-xs text-muted-foreground">
+            First scan takes 1–2 minutes. This page will show posts once they&apos;re ready.
+          </p>
+          <p className="text-xs text-muted-foreground mt-3">
+            <a href="/subreddits" className="text-primary hover:underline">Manage subreddits</a> · <a href="/settings" className="text-primary hover:underline">Update ICP settings</a>
+          </p>
+        </div>
       ) : (
         <FeedClient posts={posts} />
       )}

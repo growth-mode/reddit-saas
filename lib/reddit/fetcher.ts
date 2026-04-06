@@ -1,20 +1,27 @@
 // Reddit .json endpoint abstraction
-// Append .json to any Reddit URL to get structured JSON — no API key needed.
-// Respects Reddit's soft rate limit with 1.5s delay between requests.
+// Uses search.json (sort=new) for post listings — less aggressively blocked
+// than new.json from cloud IPs. about.json / rules.json are used for metadata.
 
 import type { RedditComment } from "@/lib/supabase/types";
 
 const DELAY_MS = 1500;
-const USER_AGENT = "Subredify/1.0 (+https://subredify.com)";
+
+// Browser-like UA — reddit is more permissive with these from cloud IPs
+const USER_AGENT =
+  "Mozilla/5.0 (compatible; Subredify/1.0; +https://www.subredify.com)";
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function redditFetch(url: string): Promise<unknown> {
-  await sleep(DELAY_MS);
+async function redditFetch(url: string, noSleep = false): Promise<unknown> {
+  if (!noSleep) await sleep(DELAY_MS);
   const res = await fetch(url, {
-    headers: { "User-Agent": USER_AGENT },
+    headers: {
+      "User-Agent": USER_AGENT,
+      Accept: "application/json, text/plain, */*",
+      "Accept-Language": "en-US,en;q=0.9",
+    },
     cache: "no-store",
   });
   if (!res.ok) {
@@ -40,9 +47,19 @@ export async function fetchSubredditPosts(
   subreddit: string,
   after?: string
 ): Promise<{ posts: RedditPost[]; after: string | null }> {
-  const params = new URLSearchParams({ limit: "25", raw_json: "1" });
+  // Use search?sort=new instead of /new.json — Reddit applies stricter
+  // IP-based rate limiting to listing endpoints (/new, /hot, /top) than
+  // to search from cloud provider IPs.
+  const params = new URLSearchParams({
+    q: "",
+    sort: "new",
+    restrict_sr: "1",
+    t: "month",
+    limit: "25",
+    raw_json: "1",
+  });
   if (after) params.set("after", after);
-  const url = `https://www.reddit.com/r/${subreddit}/new.json?${params}`;
+  const url = `https://www.reddit.com/r/${subreddit}/search.json?${params}`;
 
   const data = await redditFetch(url) as {
     data: { children: { data: RedditPostRaw }[]; after: string | null };
