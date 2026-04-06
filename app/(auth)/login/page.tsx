@@ -71,6 +71,12 @@ export default function LoginPage() {
           Sign up
         </Link>
       </p>
+      <p className="text-sm text-muted-foreground mt-2 text-center">
+        Didn&apos;t get a confirmation email?{" "}
+        <Link href="/resend-confirmation" className="text-primary hover:underline">
+          Resend it
+        </Link>
+      </p>
     </div>
   );
 }
