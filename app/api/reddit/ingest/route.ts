@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
 
   // Fire-and-forget: ICP classification
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  fetch(`${baseUrl}/api/icp/batch`, {
+  await fetch(`${baseUrl}/api/icp/batch`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

@@ -95,12 +95,10 @@ export function SubredditsClient({
     const sb = createClient();
     const { error } = await sb
       .from("user_subreddits")
-      .upsert({
-        user_id: userId,
-        subreddit_id: subreddit.id,
-        active: true,
-        profile_id: activeProfileId ?? null,
-      });
+      .upsert(
+        { user_id: userId, subreddit_id: subreddit.id, active: true, profile_id: activeProfileId ?? null },
+        { onConflict: "user_id,subreddit_id" }
+      );
 
     if (error) {
       toast.error(error.message);
