@@ -15,6 +15,13 @@ export const metadata: Metadata = {
     default: "Subredify — Reply to Reddit Threads That Rank on Google",
     template: "%s | Subredify",
   },
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
+    apple: "/icon.svg",
+  },
   description:
     "Subredify monitors Reddit for ICP conversations, scores threads for Google rank probability, and generates subreddit-rule-compliant reply drafts. Find your buyers. Reply early. Rank faster.",
   metadataBase: new URL(BASE_URL),

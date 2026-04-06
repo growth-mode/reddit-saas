@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { fetchSubredditPosts } from "@/lib/reddit/fetcher";
+import { computeRankScore } from "@/lib/reddit/rank-scorer";
+import type { Plan } from "@/lib/supabase/types";
+
+// Allow up to 60s — we inline post ingest synchronously
+export const maxDuration = 60;
+
+const PLAN_MAX_SUBREDDITS: Record<Plan, number> = {
+  free: 2,
+  starter: 5,
+  growth: 20,
+  pro: 100,
+};
 
 interface SubredditInput {
   name: string;
@@ -30,7 +43,18 @@ export async function POST(req: NextRequest) {
 
   const service = createServiceClient();
 
-  // 1. Upsert user_configs with ICP + product info
+  // 1. Get user plan to enforce subreddit limits
+  const { data: profile } = await service
+    .from("profiles")
+    .select("plan")
+    .eq("id", user.id)
+    .single();
+
+  const plan: Plan = (profile?.plan as Plan) ?? "free";
+  const maxSubs = PLAN_MAX_SUBREDDITS[plan];
+  const allowedSubreddits = subreddits.slice(0, maxSubs);
+
+  // 2. Upsert user_configs with ICP + product info
   const { error: configError } = await service.from("user_configs").upsert(
     {
       user_id: user.id,
@@ -51,10 +75,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: configError.message }, { status: 500 });
   }
 
-  // 2. Upsert subreddits (basic info) + link to user, collect IDs for ingest
-  const subredditIds: string[] = [];
+  // 3. Upsert subreddits + link to user
+  const savedSubreddits: { id: string; name: string }[] = [];
 
-  for (const sub of subreddits) {
+  for (const sub of allowedSubreddits) {
     const { data: upserted, error: subError } = await service
       .from("subreddits")
       .upsert(
@@ -66,7 +90,7 @@ export async function POST(req: NextRequest) {
         },
         { onConflict: "name" }
       )
-      .select("id")
+      .select("id, name")
       .single();
 
     if (subError || !upserted) {
@@ -74,41 +98,100 @@ export async function POST(req: NextRequest) {
       continue;
     }
 
-    subredditIds.push(upserted.id);
+    savedSubreddits.push(upserted);
 
-    // Link user ↔ subreddit
+    // Link user ↔ subreddit (fix: specify the unique constraint columns)
     await service
       .from("user_subreddits")
       .upsert(
         { user_id: user.id, subreddit_id: upserted.id, active: true },
-        { ignoreDuplicates: true }
+        { onConflict: "user_id,subreddit_id", ignoreDuplicates: true }
       );
   }
 
-  // 3. Fire rules fetch + post ingest for each subreddit (fire-and-forget)
-  //    Rules give us parsed subreddit rules for reply generation
-  //    Ingest populates the feed immediately so the user isn't staring at an empty page
+  // 4. Inline post ingest for each saved subreddit so the feed is pre-populated
+  //    on arrival. Uses the same logic as /api/reddit/ingest but runs synchronously.
+  const now = new Date().toISOString();
+  let totalIngested = 0;
+
+  for (const sub of savedSubreddits) {
+    try {
+      const { posts } = await fetchSubredditPosts(sub.name);
+      if (posts.length === 0) continue;
+
+      const rows = posts.map((p) => {
+        const rankResult = computeRankScore(
+          p.title,
+          sub.name,
+          p.score,
+          p.num_comments,
+          p.created_utc
+        );
+        return {
+          subreddit_id: sub.id,
+          reddit_id: p.reddit_id,
+          reddit_url: p.reddit_url,
+          title: p.title,
+          body: p.body,
+          author: p.author,
+          score: p.score,
+          num_comments: p.num_comments,
+          flair: p.flair,
+          created_utc: new Date(p.created_utc * 1000).toISOString(),
+          rank_opportunity_score: rankResult.score,
+          rank_signals: rankResult.signals as unknown as Record<string, unknown>,
+          rank_scored_at: now,
+        };
+      });
+
+      const { error: insertError } = await service
+        .from("posts")
+        .upsert(rows, { onConflict: "reddit_id", ignoreDuplicates: true });
+
+      if (insertError) {
+        console.error(`Post insert error for r/${sub.name}:`, insertError);
+      } else {
+        totalIngested += rows.length;
+        // Update cursor
+        await service
+          .from("subreddits")
+          .update({
+            newest_post_id: `t3_${posts[0].reddit_id}`,
+            last_scanned_at: now,
+          })
+          .eq("id", sub.id);
+      }
+    } catch (err) {
+      console.error(`Ingest failed for r/${sub.name}:`, err);
+      // Don't fail the whole request — feed just starts empty for this sub
+    }
+  }
+
+  // 5. Fire ICP batch classification for the ingested posts (background — OK to
+  //    cut off since the cron will pick it up in 30 min regardless)
   const origin = process.env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin;
+  for (const sub of savedSubreddits) {
+    fetch(`${origin}/api/icp/batch`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.CRON_SECRET}`,
+      },
+      body: JSON.stringify({ subredditId: sub.id }),
+    }).catch(() => {});
 
-  for (let i = 0; i < subreddits.length; i++) {
-    const subId = subredditIds[i];
-    const subName = subreddits[i]?.name;
-    if (!subId || !subName) continue;
-
-    // Fetch rules (background)
+    // Also fetch rules in background
     fetch(`${origin}/api/reddit/rules`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ subreddit: subName }),
-    }).catch(() => {});
-
-    // Ingest posts (background)
-    fetch(`${origin}/api/reddit/ingest`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ subredditId: subId }),
+      body: JSON.stringify({ subreddit: sub.name }),
     }).catch(() => {});
   }
 
-  return NextResponse.json({ ok: true, subredditCount: subredditIds.length });
+  return NextResponse.json({
+    ok: true,
+    subredditCount: savedSubreddits.length,
+    postsIngested: totalIngested,
+    plan,
+  });
 }
