@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { fetchSubredditPosts } from "@/lib/reddit/fetcher";
-import { computeRankScore } from "@/lib/reddit/rank-scorer";
 import type { Plan } from "@/lib/supabase/types";
-
-// Allow up to 60s — we inline post ingest synchronously
-export const maxDuration = 60;
 
 const PLAN_MAX_SUBREDDITS: Record<Plan, number> = {
   free: 2,
@@ -75,7 +70,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: configError.message }, { status: 500 });
   }
 
-  // 3. Upsert subreddits + link to user
+  // 3. Upsert subreddits + link to user — return IDs so the client can trigger ingest
   const savedSubreddits: { id: string; name: string }[] = [];
 
   for (const sub of allowedSubreddits) {
@@ -100,7 +95,6 @@ export async function POST(req: NextRequest) {
 
     savedSubreddits.push(upserted);
 
-    // Link user ↔ subreddit (fix: specify the unique constraint columns)
     await service
       .from("user_subreddits")
       .upsert(
@@ -109,78 +103,9 @@ export async function POST(req: NextRequest) {
       );
   }
 
-  // 4. Inline post ingest for each saved subreddit so the feed is pre-populated
-  //    on arrival. Uses the same logic as /api/reddit/ingest but runs synchronously.
-  const now = new Date().toISOString();
-  let totalIngested = 0;
-
-  for (const sub of savedSubreddits) {
-    try {
-      const { posts } = await fetchSubredditPosts(sub.name);
-      if (posts.length === 0) continue;
-
-      const rows = posts.map((p) => {
-        const rankResult = computeRankScore(
-          p.title,
-          sub.name,
-          p.score,
-          p.num_comments,
-          p.created_utc
-        );
-        return {
-          subreddit_id: sub.id,
-          reddit_id: p.reddit_id,
-          reddit_url: p.reddit_url,
-          title: p.title,
-          body: p.body,
-          author: p.author,
-          score: p.score,
-          num_comments: p.num_comments,
-          flair: p.flair,
-          created_utc: new Date(p.created_utc * 1000).toISOString(),
-          rank_opportunity_score: rankResult.score,
-          rank_signals: rankResult.signals as unknown as Record<string, unknown>,
-          rank_scored_at: now,
-        };
-      });
-
-      const { error: insertError } = await service
-        .from("posts")
-        .upsert(rows, { onConflict: "reddit_id", ignoreDuplicates: true });
-
-      if (insertError) {
-        console.error(`Post insert error for r/${sub.name}:`, insertError);
-      } else {
-        totalIngested += rows.length;
-        // Update cursor
-        await service
-          .from("subreddits")
-          .update({
-            newest_post_id: `t3_${posts[0].reddit_id}`,
-            last_scanned_at: now,
-          })
-          .eq("id", sub.id);
-      }
-    } catch (err) {
-      console.error(`Ingest failed for r/${sub.name}:`, err);
-      // Don't fail the whole request — feed just starts empty for this sub
-    }
-  }
-
-  // 5. Fire ICP batch classification for the ingested posts (background — OK to
-  //    cut off since the cron will pick it up in 30 min regardless)
+  // 4. Fire rules fetch in background (safe — fast endpoint, not Reddit .json)
   const origin = process.env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin;
   for (const sub of savedSubreddits) {
-    fetch(`${origin}/api/icp/batch`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.CRON_SECRET}`,
-      },
-      body: JSON.stringify({ subredditId: sub.id }),
-    }).catch(() => {});
-
-    // Also fetch rules in background
     fetch(`${origin}/api/reddit/rules`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -188,10 +113,12 @@ export async function POST(req: NextRequest) {
     }).catch(() => {});
   }
 
+  // Return saved subreddit IDs — the client wizard calls /api/reddit/ingest
+  // for each one individually so they're separate serverless invocations.
   return NextResponse.json({
     ok: true,
     subredditCount: savedSubreddits.length,
-    postsIngested: totalIngested,
+    savedSubreddits,
     plan,
   });
 }

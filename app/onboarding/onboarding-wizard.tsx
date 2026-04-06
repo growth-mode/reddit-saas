@@ -156,6 +156,7 @@ export function OnboardingWizard({ plan }: { plan: Plan }) {
   const [scanning, setScanning] = useState(false);
   const [loadingSubreddits, setLoadingSubreddits] = useState(false);
   const [completing, setCompleting] = useState(false);
+  const [ingestProgress, setIngestProgress] = useState("");
 
   // Data
   const [url, setUrl] = useState("");
@@ -224,8 +225,12 @@ export function OnboardingWizard({ plan }: { plan: Plan }) {
       return;
     }
     setCompleting(true);
+    setIngestProgress("");
     try {
       const chosenSubs = suggestions.filter((s) => selected.has(s.name));
+
+      // Save config + subreddits
+      setIngestProgress("Saving your settings...");
       const res = await fetch("/api/onboarding/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -236,10 +241,29 @@ export function OnboardingWizard({ plan }: { plan: Plan }) {
         toast.error(error ?? "Something went wrong. Please try again.");
         return;
       }
-      toast.success("You're all set! Posts are loading in your feed.");
+      const { savedSubreddits } = await res.json() as {
+        savedSubreddits: { id: string; name: string }[];
+      };
+
+      // Ingest posts for each subreddit as separate requests
+      for (let i = 0; i < savedSubreddits.length; i++) {
+        const sub = savedSubreddits[i];
+        setIngestProgress(`Scanning r/${sub.name}... (${i + 1}/${savedSubreddits.length})`);
+        try {
+          await fetch("/api/reddit/ingest", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ subredditId: sub.id }),
+          });
+        } catch {
+          // Non-fatal — feed will populate via hourly cron
+        }
+      }
+
       router.push("/feed");
     } finally {
       setCompleting(false);
+      setIngestProgress("");
     }
   }
 
@@ -507,7 +531,7 @@ export function OnboardingWizard({ plan }: { plan: Plan }) {
                   {completing ? (
                     <>
                       <div className="h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                      Setting up your feed...
+                      {ingestProgress || "Setting up your feed..."}
                     </>
                   ) : (
                     <>

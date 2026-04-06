@@ -15,7 +15,7 @@ async function redditFetch(url: string): Promise<unknown> {
   await sleep(DELAY_MS);
   const res = await fetch(url, {
     headers: { "User-Agent": USER_AGENT },
-    next: { revalidate: 0 },
+    cache: "no-store",
   });
   if (!res.ok) {
     throw new Error(`Reddit fetch failed: ${res.status} ${url}`);
