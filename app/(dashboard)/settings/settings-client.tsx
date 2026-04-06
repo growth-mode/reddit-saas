@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Trash2, Plus } from "lucide-react";
+import { Trash2, Plus, Wand2 } from "lucide-react";
 import type { UserConfig, ClientProfile } from "@/lib/supabase/types";
 import type { Plan } from "@/lib/supabase/types";
 
@@ -111,6 +112,7 @@ function profileToForm(p: ClientProfile): FormState {
 
 export function SettingsClient({ config, userId, clientProfiles: initialProfiles, plan }: Props) {
   const isPro = plan === "pro";
+  const router = useRouter();
 
   const [profiles, setProfiles] = useState<ClientProfile[]>(initialProfiles);
   const [activeProfileId, setActiveProfileId] = useState<string | null>(
@@ -281,6 +283,23 @@ export function SettingsClient({ config, userId, clientProfiles: initialProfiles
           )}
         </div>
       )}
+
+      {/* Re-run wizard */}
+      <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-3">
+        <div>
+          <p className="text-sm font-medium">ICP setup wizard</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Scan a website to auto-fill your ICP and discover new subreddits</p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => router.push("/onboarding")}
+        >
+          <Wand2 className="h-3.5 w-3.5 mr-1.5" />
+          Re-run wizard
+        </Button>
+      </div>
 
       <form onSubmit={handleSave} className="space-y-6">
         {/* Profile name */}
