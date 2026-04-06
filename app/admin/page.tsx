@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { AdminTable } from "./admin-client";
 
 export default async function AdminPage() {
   const supabase = await createClient();
@@ -17,16 +18,48 @@ export default async function AdminPage() {
   const { data: { users: authUsers } } = await service.auth.admin.listUsers();
 
   const { data: profiles } = await service.from("profiles").select("id, plan, is_admin, created_at");
-  const { data: userSubCounts } = await service.from("user_subreddits").select("user_id");
+  const { data: userSubRecs } = await service.from("user_subreddits").select("user_id, subreddit_id");
   const { data: draftCounts } = await service.from("reply_drafts").select("user_id, generated_at");
   const { data: postCounts } = await service.from("posts").select("ingested_at");
 
+  // Posts per subreddit — for "Posts in feed" per user
+  const { data: allPostsForFeed } = await service.from("posts").select("subreddit_id, ingested_at");
+
   // Build per-user stats
   const profileMap = new Map((profiles ?? []).map(p => [p.id, p]));
+
+  // subredditCount and subreddit_id set per user
   const subCountMap = new Map<string, number>();
-  (userSubCounts ?? []).forEach(s => subCountMap.set(s.user_id, (subCountMap.get(s.user_id) ?? 0) + 1));
+  const userSubredditIds = new Map<string, Set<string>>();
+  (userSubRecs ?? []).forEach(s => {
+    subCountMap.set(s.user_id, (subCountMap.get(s.user_id) ?? 0) + 1);
+    if (!userSubredditIds.has(s.user_id)) userSubredditIds.set(s.user_id, new Set());
+    userSubredditIds.get(s.user_id)!.add(s.subreddit_id);
+  });
+
+  // Posts per subreddit map
+  const postsPerSubreddit = new Map<string, { count: number; latestIngested: string | null }>();
+  (allPostsForFeed ?? []).forEach(p => {
+    const existing = postsPerSubreddit.get(p.subreddit_id);
+    const latest = existing?.latestIngested
+      ? (p.ingested_at > existing.latestIngested ? p.ingested_at : existing.latestIngested)
+      : p.ingested_at;
+    postsPerSubreddit.set(p.subreddit_id, {
+      count: (existing?.count ?? 0) + 1,
+      latestIngested: latest,
+    });
+  });
+
+  // draftCountMap and latest draft per user
   const draftCountMap = new Map<string, number>();
-  (draftCounts ?? []).forEach(d => draftCountMap.set(d.user_id, (draftCountMap.get(d.user_id) ?? 0) + 1));
+  const latestDraftMap = new Map<string, string>();
+  (draftCounts ?? []).forEach(d => {
+    draftCountMap.set(d.user_id, (draftCountMap.get(d.user_id) ?? 0) + 1);
+    if (d.generated_at) {
+      const existing = latestDraftMap.get(d.user_id);
+      if (!existing || d.generated_at > existing) latestDraftMap.set(d.user_id, d.generated_at);
+    }
+  });
 
   const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -35,14 +68,44 @@ export default async function AdminPage() {
   const recentPosts = postCounts?.filter(p => new Date(p.ingested_at) > thirtyDaysAgo).length ?? 0;
   const totalDrafts = draftCounts?.length ?? 0;
 
-  const rows = (authUsers ?? []).map(u => ({
-    id: u.id,
-    email: u.email ?? "—",
-    signedUpAt: u.created_at,
-    plan: profileMap.get(u.id)?.plan ?? "free",
-    subredditCount: subCountMap.get(u.id) ?? 0,
-    draftCount: draftCountMap.get(u.id) ?? 0,
-  })).sort((a, b) => new Date(b.signedUpAt).getTime() - new Date(a.signedUpAt).getTime());
+  const rows = (authUsers ?? []).map(u => {
+    const subIds = userSubredditIds.get(u.id) ?? new Set<string>();
+
+    // Posts in feed: sum of posts across all subreddits this user monitors
+    let postInFeedCount = 0;
+    let latestPostIngested: string | null = null as string | null;
+    subIds.forEach(subId => {
+      const stats = postsPerSubreddit.get(subId);
+      if (stats) {
+        postInFeedCount += stats.count;
+        if (stats.latestIngested) {
+          if (!latestPostIngested || stats.latestIngested > latestPostIngested) {
+            latestPostIngested = stats.latestIngested;
+          }
+        }
+      }
+    });
+
+    // Last active: most recent of latest draft generated or latest post ingested
+    const latestDraft = latestDraftMap.get(u.id) ?? null;
+    let lastActive: string | null = null;
+    if (latestDraft && latestPostIngested) {
+      lastActive = latestDraft > latestPostIngested ? latestDraft : latestPostIngested;
+    } else {
+      lastActive = latestDraft ?? latestPostIngested;
+    }
+
+    return {
+      id: u.id,
+      email: u.email ?? "—",
+      signedUpAt: u.created_at,
+      plan: profileMap.get(u.id)?.plan ?? "free",
+      subredditCount: subCountMap.get(u.id) ?? 0,
+      draftCount: draftCountMap.get(u.id) ?? 0,
+      postInFeedCount,
+      lastActive,
+    };
+  }).sort((a, b) => new Date(b.signedUpAt).getTime() - new Date(a.signedUpAt).getTime());
 
   const planCounts = rows.reduce((acc, r) => { acc[r.plan] = (acc[r.plan] ?? 0) + 1; return acc; }, {} as Record<string, number>);
 
@@ -77,38 +140,8 @@ export default async function AdminPage() {
         ))}
       </div>
 
-      {/* Users table */}
-      <div className="border border-border rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50 border-b border-border">
-            <tr>
-              <th className="text-left px-4 py-3 font-medium text-xs text-muted-foreground">Email</th>
-              <th className="text-left px-4 py-3 font-medium text-xs text-muted-foreground">Plan</th>
-              <th className="text-left px-4 py-3 font-medium text-xs text-muted-foreground">Subreddits</th>
-              <th className="text-left px-4 py-3 font-medium text-xs text-muted-foreground">Drafts</th>
-              <th className="text-left px-4 py-3 font-medium text-xs text-muted-foreground">Signed up</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {rows.map(r => (
-              <tr key={r.id} className="hover:bg-muted/20">
-                <td className="px-4 py-3 font-mono text-xs">{r.email}</td>
-                <td className="px-4 py-3">
-                  <span className={`text-xs px-2 py-0.5 rounded font-medium ${
-                    r.plan === "pro" ? "bg-primary/10 text-primary" :
-                    r.plan === "growth" ? "bg-emerald-50 text-emerald-700" :
-                    r.plan === "starter" ? "bg-blue-50 text-blue-700" :
-                    "bg-muted text-muted-foreground"
-                  }`}>{r.plan === "pro" ? "Pro Agency" : r.plan}</span>
-                </td>
-                <td className="px-4 py-3 tabular-nums text-xs">{r.subredditCount}</td>
-                <td className="px-4 py-3 tabular-nums text-xs">{r.draftCount}</td>
-                <td className="px-4 py-3 text-xs text-muted-foreground">{new Date(r.signedUpAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {/* Users table (client component for delete) */}
+      <AdminTable initialRows={rows} />
     </div>
   );
 }

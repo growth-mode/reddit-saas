@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Rss, List, FileText, Settings, CreditCard, LogOut, Layers, ChevronLeft, ChevronRight, Menu } from "lucide-react";
+import { Rss, List, FileText, Settings, CreditCard, LogOut, Layers, ChevronLeft, ChevronRight, Menu, Shield } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 function NavItem({
@@ -65,6 +65,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    async function checkAdmin() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single();
+      if (data?.is_admin) setIsAdmin(true);
+    }
+    checkAdmin();
+  }, []);
 
   // Persist collapse state
   useEffect(() => {
@@ -116,6 +128,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Bottom: collapse toggle + logout */}
       <div className="border-t border-border p-2 space-y-0.5">
+        {isAdmin && (
+          <NavItem href="/admin" icon={Shield} label="Admin" collapsed={collapsed} />
+        )}
         <button
           onClick={handleLogout}
           title="Sign out"
