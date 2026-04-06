@@ -6,9 +6,15 @@ export default async function SubredditsPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
+  const { data: clientProfiles } = await supabase
+    .from("client_profiles")
+    .select("id, name")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: true });
+
   const { data: userSubs } = await supabase
     .from("user_subreddits")
-    .select("id, active, subreddits(id, name, display_name, subscriber_count, rules_structured, rules_fetched_at, last_scanned_at)")
+    .select("id, active, profile_id, subreddits(id, name, display_name, subscriber_count, rules_structured, rules_fetched_at, last_scanned_at)")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
@@ -20,7 +26,11 @@ export default async function SubredditsPage() {
           Add subreddits to monitor for ICP conversations.
         </p>
       </div>
-      <SubredditsClient userSubs={userSubs ?? []} userId={user.id} />
+      <SubredditsClient
+        userSubs={userSubs ?? []}
+        userId={user.id}
+        clientProfiles={clientProfiles ?? []}
+      />
     </div>
   );
 }

@@ -11,6 +11,7 @@ export interface Database {
           id: string;
           name: string | null;
           plan: Plan;
+          is_admin: boolean;
           stripe_customer_id: string | null;
           stripe_subscription_id: string | null;
           created_at: string;
@@ -19,6 +20,7 @@ export interface Database {
           id: string;
           name?: string | null;
           plan?: Plan;
+          is_admin?: boolean;
           stripe_customer_id?: string | null;
           stripe_subscription_id?: string | null;
           created_at?: string;
@@ -27,6 +29,7 @@ export interface Database {
           id?: string;
           name?: string | null;
           plan?: Plan;
+          is_admin?: boolean;
           stripe_customer_id?: string | null;
           stripe_subscription_id?: string | null;
           created_at?: string;
@@ -149,6 +152,7 @@ export interface Database {
           user_id: string;
           subreddit_id: string;
           active: boolean;
+          profile_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -156,10 +160,12 @@ export interface Database {
           user_id: string;
           subreddit_id: string;
           active?: boolean;
+          profile_id?: string | null;
           created_at?: string;
         };
         Update: {
           active?: boolean;
+          profile_id?: string | null;
         };
         Relationships: [
           {
@@ -301,6 +307,59 @@ export interface Database {
           }
         ];
       };
+      client_profiles: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          product_name: string;
+          product_description: string;
+          product_url: string | null;
+          icp_description: string;
+          keywords: string[];
+          pain_points: string[];
+          competitor_names: string[];
+          reply_persona: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name?: string;
+          product_name?: string;
+          product_description?: string;
+          product_url?: string | null;
+          icp_description?: string;
+          keywords?: string[];
+          pain_points?: string[];
+          competitor_names?: string[];
+          reply_persona?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          name?: string;
+          product_name?: string;
+          product_description?: string;
+          product_url?: string | null;
+          icp_description?: string;
+          keywords?: string[];
+          pain_points?: string[];
+          competitor_names?: string[];
+          reply_persona?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "client_profiles_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       icp_signals: {
         Row: {
           id: string;
@@ -357,3 +416,4 @@ export type UserSubreddit = Database["public"]["Tables"]["user_subreddits"]["Row
 export type Post = Database["public"]["Tables"]["posts"]["Row"];
 export type ReplyDraft = Database["public"]["Tables"]["reply_drafts"]["Row"];
 export type IcpSignal = Database["public"]["Tables"]["icp_signals"]["Row"];
+export type ClientProfile = Database["public"]["Tables"]["client_profiles"]["Row"];

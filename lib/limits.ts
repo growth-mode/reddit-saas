@@ -35,7 +35,7 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     icpPerMonth: 5000,
   },
   pro: {
-    name: "Pro",
+    name: "Pro Agency",
     price: "$69/mo",
     subreddits: -1,
     draftsPerMonth: -1,

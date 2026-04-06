@@ -38,11 +38,19 @@ export async function POST(request: NextRequest) {
   }
 
   // Fetch from Reddit
-  const [about, rules, wiki] = await Promise.all([
+  const [aboutResult, rulesResult, wikiResult] = await Promise.allSettled([
     fetchSubredditAbout(name),
     fetchSubredditRules(name),
     fetchSubredditWiki(name),
   ]);
+
+  if (aboutResult.status === "rejected") {
+    return NextResponse.json({ error: `Subreddit r/${name} not found or is private.` }, { status: 404 });
+  }
+
+  const about = aboutResult.value;
+  const rules = rulesResult.status === "fulfilled" ? rulesResult.value : [];
+  const wiki = wikiResult.status === "fulfilled" ? wikiResult.value : null;
 
   const parsedRules = parseSubredditRules(rules, about.description);
 

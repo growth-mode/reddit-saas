@@ -6,11 +6,12 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { AlertTriangle, CheckCircle2, RefreshCw, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, RefreshCw, Plus, Trash2, Sparkles, X } from "lucide-react";
 
 interface SubredditRow {
   id: string;
   active: boolean;
+  profile_id: string | null;
   subreddits: {
     id: string;
     name: string;
@@ -22,24 +23,58 @@ interface SubredditRow {
   } | null;
 }
 
+interface ClientProfileOption {
+  id: string;
+  name: string;
+}
+
+interface SubredditSuggestion {
+  name: string;
+  subscriber_count: number;
+  description: string;
+  sample_posts: string[];
+}
+
+function formatSubscribers(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}m`;
+  if (n >= 1_000) return `${Math.round(n / 1_000)}k`;
+  return String(n);
+}
+
 export function SubredditsClient({
   userSubs,
   userId,
+  clientProfiles,
 }: {
   userSubs: SubredditRow[];
   userId: string;
+  clientProfiles: ClientProfileOption[];
 }) {
   const router = useRouter();
   const [input, setInput] = useState("");
   const [adding, setAdding] = useState(false);
   const [scanningId, setScanningId] = useState<string | null>(null);
+  const [activeProfileId, setActiveProfileId] = useState<string | null>(
+    clientProfiles[0]?.id ?? null
+  );
 
-  async function handleAdd(e: React.FormEvent) {
-    e.preventDefault();
-    if (!input.trim()) return;
-    setAdding(true);
+  // Suggest from ICP state
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestions, setSuggestions] = useState<SubredditSuggestion[]>([]);
+  const [hasSuggestions, setHasSuggestions] = useState(false);
+  const [selectedSuggestions, setSelectedSuggestions] = useState<Set<string>>(new Set());
+  const [addingSelected, setAddingSelected] = useState(false);
 
-    const name = input.replace(/^r\//, "").toLowerCase().trim();
+  // Filter subreddits by active profile
+  const filteredSubs = activeProfileId
+    ? userSubs.filter(us => us.profile_id === activeProfileId)
+    : userSubs;
+
+  async function handleAdd(e: React.FormEvent, subredditName?: string) {
+    if (e.preventDefault) e.preventDefault();
+    const name = (subredditName ?? input).replace(/^r\//, "").toLowerCase().trim();
+    if (!name) return;
+    if (!subredditName) setAdding(true);
 
     // 1. Fetch rules
     const rulesRes = await fetch("/api/reddit/rules", {
@@ -49,8 +84,8 @@ export function SubredditsClient({
     });
 
     if (!rulesRes.ok) {
-      toast.error("Could not fetch subreddit. Check the name.");
-      setAdding(false);
+      toast.error(`Could not fetch r/${name}. Check the name.`);
+      if (!subredditName) setAdding(false);
       return;
     }
 
@@ -60,16 +95,22 @@ export function SubredditsClient({
     const sb = createClient();
     const { error } = await sb
       .from("user_subreddits")
-      .upsert({ user_id: userId, subreddit_id: subreddit.id, active: true });
+      .upsert({
+        user_id: userId,
+        subreddit_id: subreddit.id,
+        active: true,
+        profile_id: activeProfileId ?? null,
+      });
 
     if (error) {
       toast.error(error.message);
     } else {
       toast.success(`r/${name} added`);
-      setInput("");
+      if (!subredditName) setInput("");
       router.refresh();
     }
-    setAdding(false);
+    if (!subredditName) setAdding(false);
+    return true;
   }
 
   async function handleScan(subredditId: string) {
@@ -92,24 +133,198 @@ export function SubredditsClient({
     router.refresh();
   }
 
+  async function handleSuggest() {
+    setSuggesting(true);
+    const sb = createClient();
+    const { data: configData } = await sb
+      .from("client_profiles")
+      .select("*")
+      .eq("id", activeProfileId ?? "")
+      .single();
+
+    if (!configData) {
+      // Fall back to user_configs
+      const { data: uc } = await sb.from("user_configs").select("*").eq("user_id", userId).single();
+      if (!uc) {
+        toast.error("No profile config found. Fill in your ICP settings first.");
+        setSuggesting(false);
+        return;
+      }
+      const res = await fetch("/api/onboarding/subreddits", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(uc),
+      });
+      const { subreddits, error } = await res.json() as { subreddits?: SubredditSuggestion[]; error?: string };
+      if (error || !subreddits) {
+        toast.error(error ?? "Failed to get suggestions");
+        setSuggesting(false);
+        return;
+      }
+      setSuggestions(subreddits);
+      setHasSuggestions(true);
+      setSelectedSuggestions(new Set());
+      setSuggesting(false);
+      return;
+    }
+
+    const res = await fetch("/api/onboarding/subreddits", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(configData),
+    });
+    const { subreddits, error } = await res.json() as { subreddits?: SubredditSuggestion[]; error?: string };
+    if (error || !subreddits) {
+      toast.error(error ?? "Failed to get suggestions");
+      setSuggesting(false);
+      return;
+    }
+    setSuggestions(subreddits);
+    setHasSuggestions(true);
+    setSelectedSuggestions(new Set());
+    setSuggesting(false);
+  }
+
+  async function handleAddSelected() {
+    if (selectedSuggestions.size === 0) return;
+    setAddingSelected(true);
+    for (const name of selectedSuggestions) {
+      await handleAdd({ preventDefault: () => {} } as React.FormEvent, name);
+    }
+    setHasSuggestions(false);
+    setSuggestions([]);
+    setSelectedSuggestions(new Set());
+    setAddingSelected(false);
+  }
+
+  function toggleSuggestion(name: string) {
+    setSelectedSuggestions(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }
+
   return (
     <div className="space-y-6">
-      {/* Add form */}
-      <form onSubmit={handleAdd} className="flex gap-3 max-w-md">
-        <Input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="r/SaaS or SaaS"
-          className="font-mono text-sm"
-        />
-        <Button type="submit" disabled={adding} size="sm">
-          <Plus className="h-3.5 w-3.5 mr-1.5" />
-          {adding ? "Adding..." : "Add"}
+      {/* Profile tabs */}
+      {clientProfiles.length > 1 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {clientProfiles.map(p => (
+            <button
+              key={p.id}
+              onClick={() => setActiveProfileId(p.id)}
+              className={`text-xs px-3 py-1.5 rounded-md border transition-colors ${
+                p.id === activeProfileId
+                  ? "border-primary bg-primary/5 text-primary font-medium"
+                  : "border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+            >
+              {p.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Add form + Suggest button */}
+      <div className="flex flex-col sm:flex-row gap-3 max-w-xl">
+        <form onSubmit={handleAdd} className="flex gap-3 flex-1">
+          <Input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="r/SaaS or SaaS"
+            className="font-mono text-sm"
+          />
+          <Button type="submit" disabled={adding} size="sm">
+            <Plus className="h-3.5 w-3.5 mr-1.5" />
+            {adding ? "Adding..." : "Add"}
+          </Button>
+        </form>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleSuggest}
+          disabled={suggesting}
+          className="shrink-0"
+        >
+          <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+          {suggesting ? "Thinking..." : "Suggest from ICP"}
         </Button>
-      </form>
+      </div>
+
+      {/* Suggestions panel */}
+      {hasSuggestions && (
+        <div className="border border-border rounded-lg p-5 space-y-4 bg-white">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold">Suggested for your ICP</h3>
+            <button
+              onClick={() => setHasSuggestions(false)}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {suggestions.map(s => (
+              <label
+                key={s.name}
+                className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                  selectedSuggestions.has(s.name)
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:bg-muted/30"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedSuggestions.has(s.name)}
+                  onChange={() => toggleSuggestion(s.name)}
+                  className="mt-0.5 shrink-0"
+                />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">r/{s.name}</span>
+                    {s.subscriber_count > 0 && (
+                      <span className="text-[11px] text-muted-foreground">
+                        {formatSubscribers(s.subscriber_count)} members
+                      </span>
+                    )}
+                  </div>
+                  {s.sample_posts.length > 0 && (
+                    <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">
+                      {s.sample_posts[0]}
+                    </p>
+                  )}
+                </div>
+              </label>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button
+              size="sm"
+              onClick={handleAddSelected}
+              disabled={selectedSuggestions.size === 0 || addingSelected}
+            >
+              {addingSelected
+                ? "Adding..."
+                : `Add selected (${selectedSuggestions.size})`}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setHasSuggestions(false)}
+            >
+              Close
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Subreddit list */}
-      {userSubs.length === 0 ? (
+      {filteredSubs.length === 0 ? (
         <div className="border border-dashed border-border rounded-lg p-10 text-center">
           <p className="text-sm text-muted-foreground">No subreddits added yet.</p>
           <p className="text-xs text-muted-foreground mt-1">
@@ -118,7 +333,7 @@ export function SubredditsClient({
         </div>
       ) : (
         <div className="border border-border rounded-lg divide-y divide-border">
-          {userSubs.map((us) => {
+          {filteredSubs.map((us) => {
             const sub = us.subreddits;
             if (!sub) return null;
             const rules = sub.rules_structured as { isSelfPromotionRule?: boolean }[] | null;
