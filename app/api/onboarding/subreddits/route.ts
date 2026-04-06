@@ -11,46 +11,32 @@ export interface SubredditSuggestion {
   sample_posts: string[];
 }
 
-async function validateSubreddit(name: string): Promise<SubredditSuggestion | null> {
+// Lightly enrich a subreddit with about.json — used sequentially (2 at a time)
+// to avoid Reddit rate-limiting Vercel's IP on parallel requests.
+async function enrichSubreddit(name: string): Promise<SubredditSuggestion> {
   try {
     const res = await fetch(
-      `https://www.reddit.com/r/${name}/new.json?limit=5&raw_json=1`,
+      `https://www.reddit.com/r/${name}/about.json?raw_json=1`,
       {
         headers: { "User-Agent": "Subredify/1.0 (+https://www.subredify.com)" },
         next: { revalidate: 0 },
-        signal: AbortSignal.timeout(8000),
+        // 5s timeout — if slow just use the name
+        signal: AbortSignal.timeout ? AbortSignal.timeout(5000) : undefined,
       }
     );
-    if (!res.ok) return null;
-
-    const data = (await res.json()) as {
-      data: {
-        children: {
-          data: {
-            title: string;
-            subreddit: string;
-            subreddit_subscribers: number;
-            subreddit_type: string;
-          };
-        }[];
+    if (res.ok) {
+      const data = (await res.json()) as { data: { subscribers?: number; public_description?: string } };
+      return {
+        name,
+        subscriber_count: data.data?.subscribers ?? 0,
+        description: data.data?.public_description ?? "",
+        sample_posts: [],
       };
-    };
-
-    const children = data.data?.children ?? [];
-    if (children.length === 0) return null;
-
-    const first = children[0].data;
-    if (first.subreddit_type === "private") return null;
-
-    return {
-      name: first.subreddit,
-      subscriber_count: first.subreddit_subscribers ?? 0,
-      description: "",
-      sample_posts: children.slice(0, 2).map((c) => c.data.title),
-    };
+    }
   } catch {
-    return null;
+    // Reddit blocked or timed out — return stub, still usable
   }
+  return { name, subscriber_count: 0, description: "", sample_posts: [] };
 }
 
 export async function POST(req: NextRequest) {
@@ -104,18 +90,16 @@ Pain points: ${pain_points?.join(", ")}`,
     return NextResponse.json({ error: "Failed to generate suggestions" }, { status: 500 });
   }
 
-  // Validate all in parallel — one-time operation, no need for rate-limit delay
-  const results = await Promise.allSettled(
-    suggestedNames.slice(0, 12).map((name) => validateSubreddit(name))
-  );
+  // Take top 8 suggestions and enrich them sequentially in pairs to avoid
+  // Reddit IP rate-limiting that kills all results when run in parallel.
+  const top8 = suggestedNames.slice(0, 8);
+  const enriched: SubredditSuggestion[] = [];
 
-  const valid: SubredditSuggestion[] = results
-    .filter(
-      (r): r is PromiseFulfilledResult<SubredditSuggestion> =>
-        r.status === "fulfilled" && r.value !== null
-    )
-    .map((r) => r.value)
-    .slice(0, 8);
+  for (let i = 0; i < top8.length; i += 2) {
+    const batch = top8.slice(i, i + 2);
+    const results = await Promise.all(batch.map(enrichSubreddit));
+    enriched.push(...results);
+  }
 
-  return NextResponse.json({ subreddits: valid });
+  return NextResponse.json({ subreddits: enriched });
 }
