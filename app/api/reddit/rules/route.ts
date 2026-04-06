@@ -12,9 +12,15 @@ import { parseSubredditRules } from "@/lib/reddit/rules-parser";
 // Fetches and stores rules for a subreddit. Called when user adds a subreddit
 // or when rules are stale (>7 days). Returns the parsed rules.
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Allow internal server-to-server calls (e.g. background fetch from onboarding/complete)
+  const authHeader = request.headers.get("authorization");
+  const isInternal = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+
+  if (!isInternal) {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const { subreddit } = await request.json() as { subreddit: string };
   if (!subreddit) return NextResponse.json({ error: "subreddit required" }, { status: 400 });

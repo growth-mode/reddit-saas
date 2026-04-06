@@ -108,7 +108,10 @@ export async function POST(req: NextRequest) {
   for (const sub of savedSubreddits) {
     fetch(`${origin}/api/reddit/rules`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.CRON_SECRET}`,
+      },
       body: JSON.stringify({ subreddit: sub.name }),
     }).catch(() => {});
   }

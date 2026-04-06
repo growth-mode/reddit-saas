@@ -1,37 +1,93 @@
-// Reddit .json endpoint abstraction
-// Uses search.json (sort=new) for post listings — less aggressively blocked
-// than new.json from cloud IPs. about.json / rules.json are used for metadata.
+// Reddit API abstraction
+// Uses OAuth (client_credentials) when REDDIT_CLIENT_ID + REDDIT_CLIENT_SECRET are set.
+// Falls back to unauthenticated www.reddit.com for local dev.
+//
+// OAuth endpoint (oauth.reddit.com) is not subject to the same datacenter-IP
+// blocking that affects unauthenticated requests from Vercel / cloud IPs.
+//
+// To set up: create a "script" app at https://www.reddit.com/prefs/apps
+// Set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET in Vercel env vars.
 
 import type { RedditComment } from "@/lib/supabase/types";
 
-const DELAY_MS = 1500;
+const DELAY_MS = 1200;
 
-// Browser-like UA — reddit is more permissive with these from cloud IPs
-const USER_AGENT =
-  "Mozilla/5.0 (compatible; Subredify/1.0; +https://www.subredify.com)";
+// Must follow Reddit's UA format: <platform>:<appID>:<version> (by /u/<reddit username>)
+const USER_AGENT = "server:subredify:1.0 (by /u/subredify)";
+
+// Module-level token cache — persists across calls within the same serverless invocation
+let cachedToken: { token: string; expiresAt: number } | null = null;
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function redditFetch(url: string, noSleep = false): Promise<unknown> {
-  if (!noSleep) await sleep(DELAY_MS);
-  const res = await fetch(url, {
+async function getAccessToken(): Promise<string | null> {
+  const clientId = process.env.REDDIT_CLIENT_ID;
+  const clientSecret = process.env.REDDIT_CLIENT_SECRET;
+  if (!clientId || !clientSecret) return null;
+
+  // Reuse cached token if still valid (5 min buffer before expiry)
+  if (cachedToken && Date.now() < cachedToken.expiresAt - 300_000) {
+    return cachedToken.token;
+  }
+
+  const creds = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+  const res = await fetch("https://www.reddit.com/api/v1/access_token", {
+    method: "POST",
     headers: {
+      Authorization: `Basic ${creds}`,
       "User-Agent": USER_AGENT,
-      Accept: "application/json, text/plain, */*",
-      "Accept-Language": "en-US,en;q=0.9",
+      "Content-Type": "application/x-www-form-urlencoded",
     },
+    body: "grant_type=client_credentials",
     cache: "no-store",
   });
+
   if (!res.ok) {
-    throw new Error(`Reddit fetch failed: ${res.status} ${url}`);
+    console.error(`Reddit OAuth token fetch failed: ${res.status}`);
+    return null;
+  }
+
+  const data = await res.json() as { access_token: string; expires_in: number };
+  cachedToken = {
+    token: data.access_token,
+    expiresAt: Date.now() + data.expires_in * 1000,
+  };
+  return cachedToken.token;
+}
+
+async function redditFetch(url: string, noSleep = false): Promise<unknown> {
+  if (!noSleep) await sleep(DELAY_MS);
+
+  const token = await getAccessToken();
+
+  let fetchUrl = url;
+  const headers: Record<string, string> = {
+    "User-Agent": USER_AGENT,
+    Accept: "application/json",
+  };
+
+  if (token) {
+    // Route through oauth.reddit.com — bypasses cloud IP blocking
+    fetchUrl = url
+      .replace("https://www.reddit.com/", "https://oauth.reddit.com/")
+      .replace("https://www.reddit.com", "https://oauth.reddit.com");
+    headers["Authorization"] = `Bearer ${token}`;
+  } else {
+    // Dev fallback — add browser-like headers
+    headers["Accept-Language"] = "en-US,en;q=0.9";
+  }
+
+  const res = await fetch(fetchUrl, { headers, cache: "no-store" });
+  if (!res.ok) {
+    throw new Error(`Reddit fetch failed: ${res.status} ${fetchUrl}`);
   }
   return res.json();
 }
 
 export interface RedditPost {
-  reddit_id: string;       // t3_xxxxx stripped to xxxxx
+  reddit_id: string;
   reddit_url: string;
   title: string;
   body: string;
@@ -47,19 +103,13 @@ export async function fetchSubredditPosts(
   subreddit: string,
   after?: string
 ): Promise<{ posts: RedditPost[]; after: string | null }> {
-  // Use search?sort=new instead of /new.json — Reddit applies stricter
-  // IP-based rate limiting to listing endpoints (/new, /hot, /top) than
-  // to search from cloud provider IPs.
+  // Use /new.json via OAuth — clean listing endpoint, no search hack needed
   const params = new URLSearchParams({
-    q: "",
-    sort: "new",
-    restrict_sr: "1",
-    t: "month",
     limit: "25",
     raw_json: "1",
   });
   if (after) params.set("after", after);
-  const url = `https://www.reddit.com/r/${subreddit}/search.json?${params}`;
+  const url = `https://www.reddit.com/r/${subreddit}/new.json?${params}`;
 
   const data = await redditFetch(url) as {
     data: { children: { data: RedditPostRaw }[]; after: string | null };
@@ -124,7 +174,7 @@ export interface SubredditAbout {
   title: string;
   public_description: string;
   subscribers: number;
-  description: string; // sidebar markdown
+  description: string;
 }
 
 export async function fetchSubredditAbout(subreddit: string): Promise<SubredditAbout> {
