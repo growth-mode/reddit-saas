@@ -46,18 +46,17 @@ export async function POST(req: NextRequest) {
   let websiteText = "";
   try {
     websiteText = await fetchWebsiteText(normalized);
-  } catch {
+  } catch (fetchErr) {
+    console.error("[onboarding/scan] Website fetch failed:", normalized, fetchErr);
     return NextResponse.json(
       { error: "Could not reach that URL. Check it's publicly accessible." },
       { status: 422 }
     );
   }
 
+  // SPA or JS-heavy sites may return nearly empty HTML — use URL as fallback context
   if (websiteText.length < 100) {
-    return NextResponse.json(
-      { error: "Not enough content found on that page." },
-      { status: 422 }
-    );
+    websiteText = `Website URL: ${normalized}. Extract ICP based on the domain name and URL structure alone.`;
   }
 
   const message = await anthropic.messages.create({
@@ -77,10 +76,18 @@ Return ONLY valid JSON — no markdown fences, no explanation:
   });
 
   const raw = message.content[0].type === "text" ? message.content[0].text : "{}";
+
+  // Strip markdown fences if Claude wrapped the JSON despite instructions
+  const cleaned = raw
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```\s*$/, "")
+    .trim();
+
   try {
-    const icp = JSON.parse(raw);
+    const icp = JSON.parse(cleaned);
     return NextResponse.json({ icp, url: normalized });
-  } catch {
+  } catch (err) {
+    console.error("[onboarding/scan] JSON parse failed. Raw response:", raw, err);
     return NextResponse.json({ error: "Could not extract ICP from your site." }, { status: 500 });
   }
 }

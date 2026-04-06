@@ -94,11 +94,13 @@ Pain points: ${pain_points?.join(", ")}`,
   });
 
   const raw = message.content[0].type === "text" ? message.content[0].text : "[]";
+  const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
   let suggestedNames: string[] = [];
   try {
-    suggestedNames = JSON.parse(raw);
+    suggestedNames = JSON.parse(cleaned);
     if (!Array.isArray(suggestedNames)) suggestedNames = [];
-  } catch {
+  } catch (err) {
+    console.error("[onboarding/subreddits] JSON parse failed. Raw:", raw, err);
     return NextResponse.json({ error: "Failed to generate suggestions" }, { status: 500 });
   }
 
