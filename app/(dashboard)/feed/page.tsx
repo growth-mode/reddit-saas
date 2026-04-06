@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { FeedClient } from "./feed-client";
 
@@ -11,6 +12,18 @@ export default async function FeedPage() {
     .select("subreddit_id")
     .eq("user_id", user.id)
     .eq("active", true);
+
+  // New user: no subreddits + no ICP config → send to onboarding wizard
+  if (!userSubs || userSubs.length === 0) {
+    const { data: config } = await supabase
+      .from("user_configs")
+      .select("product_url")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!config?.product_url) {
+      redirect("/onboarding");
+    }
+  }
 
   const subredditIds = (userSubs ?? []).map((s) => s.subreddit_id);
 
