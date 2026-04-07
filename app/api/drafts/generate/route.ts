@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
       risk_score: risk.risk_score,
       risk_reasons: risk.risk_reasons,
       risk_detail: risk.risk_detail,
-      model_used: "claude-sonnet-4-5-20251001",
+      model_used: "claude-sonnet-4-6",
       generation_prompt: generationPrompt.slice(0, 5000),
     })
     .select()

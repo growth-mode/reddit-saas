@@ -50,8 +50,21 @@ export async function POST(request: NextRequest) {
     fetchSubredditWiki(name),
   ]);
 
+  // If Reddit blocks us (403), still create the subreddit row so it can be linked
   if (aboutResult.status === "rejected") {
-    return NextResponse.json({ error: `Subreddit r/${name} not found or is private.` }, { status: 404 });
+    console.warn(`Reddit blocked about fetch for r/${name}, creating stub entry`);
+    const { data: stubbed, error: stubErr } = await service
+      .from("subreddits")
+      .upsert(
+        { name, scan_enabled: true, updated_at: new Date().toISOString() },
+        { onConflict: "name" }
+      )
+      .select("id, name")
+      .single();
+    if (stubErr) {
+      return NextResponse.json({ error: stubErr.message }, { status: 500 });
+    }
+    return NextResponse.json({ subreddit: stubbed, cached: false, stub: true });
   }
 
   const about = aboutResult.value;

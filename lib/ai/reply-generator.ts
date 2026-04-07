@@ -57,7 +57,7 @@ ${commentsBlock || "(no comments yet)"}
 Output ONLY the reply text — no preamble, no quotation marks, no explanation.`;
 
   const message = await client.messages.create({
-    model: "claude-sonnet-4-5-20251001",
+    model: "claude-sonnet-4-6",
     max_tokens: 600,
     system: systemPrompt,
     messages: [{ role: "user", content: userPrompt }],
