@@ -16,10 +16,16 @@ export async function GET(request: NextRequest) {
   const service = createServiceClient();
 
   // Get all active user_subreddits with user plan + spend info
-  const { data: userSubs } = await service
+  const { data: userSubsRaw } = await service
     .from("user_subreddits")
     .select("subreddit_id, user_id, profiles(plan, apify_spend_usd, apify_spend_reset_at)")
     .eq("active", true);
+
+  const userSubs = userSubsRaw as unknown as Array<{
+    subreddit_id: string;
+    user_id: string;
+    profiles: { plan: Plan; apify_spend_usd: number; apify_spend_reset_at: string } | null;
+  }> | null;
 
   if (!userSubs || userSubs.length === 0) {
     return NextResponse.json({ triggered: 0 });
@@ -29,11 +35,11 @@ export async function GET(request: NextRequest) {
   // Track which user "owns" each scan for budget tracking
   const subMap = new Map<string, { subredditId: string; userId: string; plan: Plan }>();
   for (const us of userSubs) {
-    const profile = us.profiles as unknown as {
+    const profile = us.profiles as {
       plan: Plan;
       apify_spend_usd: number;
       apify_spend_reset_at: string;
-    };
+    } | null;
     const plan = profile?.plan ?? "free";
     const limits = getLimits(plan);
 

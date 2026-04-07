@@ -50,8 +50,8 @@ export async function fetchPostsViaApify(
       proxy: { useApifyProxy: true },
     },
     {
-      memoryMbytes: 2048,
-      timeoutSecs: 120,
+      memory: 2048,
+      timeout: 120,
     }
   );
 

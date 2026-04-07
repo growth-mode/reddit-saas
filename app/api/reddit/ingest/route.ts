@@ -34,14 +34,20 @@ export async function POST(request: NextRequest) {
   let postsPerScan = 10;
 
   if (userId) {
-    const { data: profile } = await service
+    const { data: profileRaw } = await service
       .from("profiles")
       .select("plan, apify_spend_usd, apify_spend_reset_at")
       .eq("id", userId)
       .single();
 
+    const profile = profileRaw as unknown as {
+      plan: Plan;
+      apify_spend_usd: number;
+      apify_spend_reset_at: string;
+    } | null;
+
     if (profile) {
-      plan = (profile.plan as Plan) ?? "free";
+      plan = profile.plan ?? "free";
       const limits = getLimits(plan);
       postsPerScan = limits.postsPerScan;
 
@@ -51,7 +57,7 @@ export async function POST(request: NextRequest) {
       if (now.getMonth() !== resetAt.getMonth() || now.getFullYear() !== resetAt.getFullYear()) {
         await service
           .from("profiles")
-          .update({ apify_spend_usd: 0, apify_spend_reset_at: now.toISOString() })
+          .update({ apify_spend_usd: 0, apify_spend_reset_at: now.toISOString() } as Record<string, unknown>)
           .eq("id", userId);
         profile.apify_spend_usd = 0;
       }
@@ -99,7 +105,7 @@ export async function POST(request: NextRequest) {
           .from("profiles")
           .update({
             apify_spend_usd: Number(actualCost),
-          })
+          } as Record<string, unknown>)
           .eq("id", userId)
           .then(() => {});
       }
