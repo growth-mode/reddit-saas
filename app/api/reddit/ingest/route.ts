@@ -3,7 +3,6 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { fetchSubredditPosts } from "@/lib/reddit/fetcher";
 import { computeRankScore } from "@/lib/reddit/rank-scorer";
 
-export const runtime = "edge";
 export const maxDuration = 300;
 
 // POST /api/reddit/ingest

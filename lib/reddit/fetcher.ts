@@ -1,87 +1,56 @@
 // Reddit API abstraction
-// Uses OAuth (client_credentials) when REDDIT_CLIENT_ID + REDDIT_CLIENT_SECRET are set.
-// Falls back to unauthenticated www.reddit.com for local dev.
-//
-// OAuth endpoint (oauth.reddit.com) is not subject to the same datacenter-IP
-// blocking that affects unauthenticated requests from Vercel / cloud IPs.
-//
-// To set up: create a "script" app at https://www.reddit.com/prefs/apps
-// Set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET in Vercel env vars.
+// Proxies all Reddit requests through a Supabase Edge Function (Deno Deploy)
+// to avoid Vercel's datacenter IPs being blocked by Reddit.
+// Falls back to direct fetch for local development.
 
 import type { RedditComment } from "@/lib/supabase/types";
 
 const DELAY_MS = 1200;
 
-// Must follow Reddit's UA format: <platform>:<appID>:<version> (by /u/<reddit username>)
-const USER_AGENT = "server:subredify:1.0 (by /u/subredify)";
-
-// Module-level token cache — persists across calls within the same serverless invocation
-let cachedToken: { token: string; expiresAt: number } | null = null;
-
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function getAccessToken(): Promise<string | null> {
-  const clientId = process.env.REDDIT_CLIENT_ID;
-  const clientSecret = process.env.REDDIT_CLIENT_SECRET;
-  if (!clientId || !clientSecret) return null;
-
-  // Reuse cached token if still valid (5 min buffer before expiry)
-  if (cachedToken && Date.now() < cachedToken.expiresAt - 300_000) {
-    return cachedToken.token;
-  }
-
-  const creds = btoa(`${clientId}:${clientSecret}`);
-  const res = await fetch("https://www.reddit.com/api/v1/access_token", {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${creds}`,
-      "User-Agent": USER_AGENT,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: "grant_type=client_credentials",
-    cache: "no-store",
-  });
-
-  if (!res.ok) {
-    console.error(`Reddit OAuth token fetch failed: ${res.status}`);
-    return null;
-  }
-
-  const data = await res.json() as { access_token: string; expires_in: number };
-  cachedToken = {
-    token: data.access_token,
-    expiresAt: Date.now() + data.expires_in * 1000,
-  };
-  return cachedToken.token;
 }
 
 async function redditFetch(url: string, noSleep = false): Promise<unknown> {
   if (!noSleep) await sleep(DELAY_MS);
 
-  const token = await getAccessToken();
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  let fetchUrl = url;
-  const headers: Record<string, string> = {
-    "User-Agent": USER_AGENT,
-    Accept: "application/json",
-  };
+  if (supabaseUrl && serviceKey) {
+    // Proxy through Supabase Edge Function (runs on Deno Deploy — not blocked by Reddit)
+    const proxyUrl = `${supabaseUrl}/functions/v1/reddit-proxy`;
+    const res = await fetch(proxyUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${serviceKey}`,
+      },
+      body: JSON.stringify({ url }),
+      cache: "no-store",
+    });
 
-  if (token) {
-    // Route through oauth.reddit.com — bypasses cloud IP blocking
-    fetchUrl = url
-      .replace("https://www.reddit.com/", "https://oauth.reddit.com/")
-      .replace("https://www.reddit.com", "https://oauth.reddit.com");
-    headers["Authorization"] = `Bearer ${token}`;
-  } else {
-    // Dev fallback — add browser-like headers
-    headers["Accept-Language"] = "en-US,en;q=0.9";
+    if (!res.ok) {
+      const errorBody = await res.text().catch(() => "");
+      console.error(`Reddit proxy error: ${res.status} for ${url}`, errorBody);
+      throw new Error(`Reddit proxy failed: ${res.status} ${url} — ${errorBody.slice(0, 200)}`);
+    }
+
+    return res.json();
   }
 
-  const res = await fetch(fetchUrl, { headers, cache: "no-store" });
+  // Local dev fallback — direct fetch
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent": "server:subredify:1.0 (by /u/subredify)",
+      Accept: "application/json",
+      "Accept-Language": "en-US,en;q=0.9",
+    },
+    cache: "no-store",
+  });
+
   if (!res.ok) {
-    throw new Error(`Reddit fetch failed: ${res.status} ${fetchUrl}`);
+    throw new Error(`Reddit fetch failed: ${res.status} ${url}`);
   }
   return res.json();
 }
@@ -103,7 +72,6 @@ export async function fetchSubredditPosts(
   subreddit: string,
   after?: string
 ): Promise<{ posts: RedditPost[]; after: string | null }> {
-  // Use /new.json via OAuth — clean listing endpoint, no search hack needed
   const params = new URLSearchParams({
     limit: "25",
     raw_json: "1",
@@ -111,7 +79,7 @@ export async function fetchSubredditPosts(
   if (after) params.set("after", after);
   const url = `https://www.reddit.com/r/${subreddit}/new.json?${params}`;
 
-  const data = await redditFetch(url) as {
+  const data = (await redditFetch(url)) as {
     data: { children: { data: RedditPostRaw }[]; after: string | null };
   };
 
@@ -136,7 +104,7 @@ export async function fetchPostWithComments(
   postId: string
 ): Promise<{ post: RedditPost; comments: RedditComment[] }> {
   const url = `https://www.reddit.com/r/${subredditName}/comments/${postId}.json?limit=10&depth=1&raw_json=1`;
-  const data = await redditFetch(url) as [
+  const data = (await redditFetch(url)) as [
     { data: { children: [{ data: RedditPostRaw }] } },
     { data: { children: { data: RedditCommentRaw }[] } }
   ];
@@ -177,9 +145,11 @@ export interface SubredditAbout {
   description: string;
 }
 
-export async function fetchSubredditAbout(subreddit: string): Promise<SubredditAbout> {
+export async function fetchSubredditAbout(
+  subreddit: string
+): Promise<SubredditAbout> {
   const url = `https://www.reddit.com/r/${subreddit}/about.json?raw_json=1`;
-  const data = await redditFetch(url) as { data: RedditSubredditAboutRaw };
+  const data = (await redditFetch(url)) as { data: RedditSubredditAboutRaw };
   const d = data.data;
   return {
     display_name: d.display_name,
@@ -198,9 +168,11 @@ export interface SubredditRule {
   priority: number;
 }
 
-export async function fetchSubredditRules(subreddit: string): Promise<SubredditRule[]> {
+export async function fetchSubredditRules(
+  subreddit: string
+): Promise<SubredditRule[]> {
   const url = `https://www.reddit.com/r/${subreddit}/about/rules.json?raw_json=1`;
-  const data = await redditFetch(url) as { rules: SubredditRuleRaw[] };
+  const data = (await redditFetch(url)) as { rules: SubredditRuleRaw[] };
   return (data.rules || []).map((r) => ({
     short_name: r.short_name || "",
     description: r.description || "",
@@ -210,10 +182,14 @@ export async function fetchSubredditRules(subreddit: string): Promise<SubredditR
   }));
 }
 
-export async function fetchSubredditWiki(subreddit: string): Promise<string | null> {
+export async function fetchSubredditWiki(
+  subreddit: string
+): Promise<string | null> {
   try {
     const url = `https://www.reddit.com/r/${subreddit}/wiki/index.json?raw_json=1`;
-    const data = await redditFetch(url) as { data: { content_md: string } };
+    const data = (await redditFetch(url)) as {
+      data: { content_md: string };
+    };
     return data.data?.content_md || null;
   } catch {
     return null;
