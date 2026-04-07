@@ -11,22 +11,37 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function redditFetch(url: string, noSleep = false): Promise<unknown> {
-  if (!noSleep) await sleep(DELAY_MS);
+interface ProxyBody {
+  url: string;
+  type?: "posts" | "about" | "rules" | "wiki";
+  subreddit?: string;
+}
+
+async function redditFetch(
+  url: string,
+  opts?: { noSleep?: boolean; type?: "posts" | "about" | "rules" | "wiki"; subreddit?: string }
+): Promise<unknown> {
+  if (!opts?.noSleep) await sleep(DELAY_MS);
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (supabaseUrl && serviceKey) {
-    // Proxy through Supabase Edge Function (runs on Deno Deploy — not blocked by Reddit)
+    // Proxy through Supabase Edge Function
+    // For posts: uses Pullpush.io (free Reddit data mirror, never blocked)
+    // For about/rules/wiki: tries direct Reddit fetch with browser headers
     const proxyUrl = `${supabaseUrl}/functions/v1/reddit-proxy`;
+    const body: ProxyBody = { url };
+    if (opts?.type) body.type = opts.type;
+    if (opts?.subreddit) body.subreddit = opts.subreddit;
+
     const res = await fetch(proxyUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${serviceKey}`,
       },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify(body),
       cache: "no-store",
     });
 
@@ -79,7 +94,7 @@ export async function fetchSubredditPosts(
   if (after) params.set("after", after);
   const url = `https://www.reddit.com/r/${subreddit}/new.json?${params}`;
 
-  const data = (await redditFetch(url)) as {
+  const data = (await redditFetch(url, { type: "posts", subreddit })) as {
     data: { children: { data: RedditPostRaw }[]; after: string | null };
   };
 
@@ -104,7 +119,7 @@ export async function fetchPostWithComments(
   postId: string
 ): Promise<{ post: RedditPost; comments: RedditComment[] }> {
   const url = `https://www.reddit.com/r/${subredditName}/comments/${postId}.json?limit=10&depth=1&raw_json=1`;
-  const data = (await redditFetch(url)) as [
+  const data = (await redditFetch(url, { type: "about" })) as [
     { data: { children: [{ data: RedditPostRaw }] } },
     { data: { children: { data: RedditCommentRaw }[] } }
   ];
@@ -149,7 +164,7 @@ export async function fetchSubredditAbout(
   subreddit: string
 ): Promise<SubredditAbout> {
   const url = `https://www.reddit.com/r/${subreddit}/about.json?raw_json=1`;
-  const data = (await redditFetch(url)) as { data: RedditSubredditAboutRaw };
+  const data = (await redditFetch(url, { type: "about" })) as { data: RedditSubredditAboutRaw };
   const d = data.data;
   return {
     display_name: d.display_name,
@@ -172,7 +187,7 @@ export async function fetchSubredditRules(
   subreddit: string
 ): Promise<SubredditRule[]> {
   const url = `https://www.reddit.com/r/${subreddit}/about/rules.json?raw_json=1`;
-  const data = (await redditFetch(url)) as { rules: SubredditRuleRaw[] };
+  const data = (await redditFetch(url, { type: "rules" })) as { rules: SubredditRuleRaw[] };
   return (data.rules || []).map((r) => ({
     short_name: r.short_name || "",
     description: r.description || "",
@@ -187,7 +202,7 @@ export async function fetchSubredditWiki(
 ): Promise<string | null> {
   try {
     const url = `https://www.reddit.com/r/${subreddit}/wiki/index.json?raw_json=1`;
-    const data = (await redditFetch(url)) as {
+    const data = (await redditFetch(url, { type: "wiki" })) as {
       data: { content_md: string };
     };
     return data.data?.content_md || null;
