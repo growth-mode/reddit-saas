@@ -65,9 +65,9 @@ export function SubredditsClient({
   const [selectedSuggestions, setSelectedSuggestions] = useState<Set<string>>(new Set());
   const [addingSelected, setAddingSelected] = useState(false);
 
-  // Filter subreddits by active profile
+  // Filter subreddits by active profile (include null profile_id — those came from onboarding)
   const filteredSubs = activeProfileId
-    ? userSubs.filter(us => us.profile_id === activeProfileId)
+    ? userSubs.filter(us => us.profile_id === activeProfileId || us.profile_id === null)
     : userSubs;
 
   async function handleAdd(e: React.FormEvent, subredditName?: string) {
