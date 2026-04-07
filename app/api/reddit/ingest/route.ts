@@ -26,13 +26,11 @@ export async function POST(request: NextRequest) {
 
   const { posts: rawPosts } = await fetchSubredditPosts(subreddit.name);
 
-  // Filter out removed/deleted/old posts
-  const sevenDaysAgo = Date.now() / 1000 - 7 * 24 * 60 * 60;
+  // Filter out removed/deleted posts (Pullpush data lags ~11 months, so no time filter)
   const posts = rawPosts.filter((p) => {
     if (p.title === "[Removed by moderator]" || p.title === "[deleted]") return false;
     if (p.author === "[deleted]" || p.author === "AutoModerator") return false;
     if (p.body === "[removed]" || p.body === "[deleted]") return false;
-    if (p.created_utc < sevenDaysAgo) return false;
     return true;
   });
 
