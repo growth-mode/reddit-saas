@@ -24,7 +24,17 @@ export async function POST(request: NextRequest) {
 
   if (!subreddit) return NextResponse.json({ error: "Subreddit not found" }, { status: 404 });
 
-  const { posts } = await fetchSubredditPosts(subreddit.name);
+  const { posts: rawPosts } = await fetchSubredditPosts(subreddit.name);
+
+  // Filter out removed/deleted/old posts
+  const sevenDaysAgo = Date.now() / 1000 - 7 * 24 * 60 * 60;
+  const posts = rawPosts.filter((p) => {
+    if (p.title === "[Removed by moderator]" || p.title === "[deleted]") return false;
+    if (p.author === "[deleted]" || p.author === "AutoModerator") return false;
+    if (p.body === "[removed]" || p.body === "[deleted]") return false;
+    if (p.created_utc < sevenDaysAgo) return false;
+    return true;
+  });
 
   if (posts.length === 0) {
     return NextResponse.json({ ingested: 0 });
