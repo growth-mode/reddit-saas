@@ -34,7 +34,6 @@ export default async function FeedPage() {
       .from("posts")
       .select("*, subreddits(name)")
       .in("subreddit_id", subredditIds)
-      .or("icp_score.is.null,icp_score.gte.40")
       .order("rank_opportunity_score", { ascending: false })
       .limit(50);
 

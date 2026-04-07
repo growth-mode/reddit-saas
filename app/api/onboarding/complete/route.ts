@@ -70,6 +70,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: configError.message }, { status: 500 });
   }
 
+  // Also sync ICP data to client_profiles (used by settings page + subreddit suggestions)
+  await service.from("client_profiles").upsert(
+    {
+      user_id: user.id,
+      name: config.product_name || "My Company",
+      product_name: config.product_name,
+      product_description: config.product_description,
+      product_url: website_url,
+      icp_description: config.icp_description,
+      keywords: config.keywords,
+      pain_points: config.pain_points,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" }
+  ).then(({ error }) => {
+    if (error) console.error("client_profiles sync error:", error);
+  });
+
   // 3. Upsert subreddits + link to user — return IDs so the client can trigger ingest
   const savedSubreddits: { id: string; name: string }[] = [];
 
@@ -78,7 +96,7 @@ export async function POST(req: NextRequest) {
       .from("subreddits")
       .upsert(
         {
-          name: sub.name.toLowerCase(),
+          name: sub.name.replace(/^r\//, "").toLowerCase().trim(),
           subscriber_count: sub.subscriber_count,
           scan_enabled: true,
           updated_at: new Date().toISOString(),
