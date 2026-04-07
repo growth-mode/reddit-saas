@@ -32,7 +32,7 @@ async function getAccessToken(): Promise<string | null> {
     return cachedToken.token;
   }
 
-  const creds = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+  const creds = btoa(`${clientId}:${clientSecret}`);
   const res = await fetch("https://www.reddit.com/api/v1/access_token", {
     method: "POST",
     headers: {
