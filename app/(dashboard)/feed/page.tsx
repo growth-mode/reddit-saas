@@ -2,16 +2,20 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { FeedClient } from "./feed-client";
 
+export const dynamic = "force-dynamic";
+
 export default async function FeedPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: userSubs } = await supabase
+  const { data: userSubs, error: subsError } = await supabase
     .from("user_subreddits")
     .select("subreddit_id")
     .eq("user_id", user.id)
     .eq("active", true);
+
+  console.log("[feed] user:", user.id, "subs:", userSubs?.length ?? 0, "error:", subsError?.message ?? "none");
 
   // New user: no subreddits + no ICP config → send to onboarding wizard
   if (!userSubs || userSubs.length === 0) {
@@ -30,12 +34,14 @@ export default async function FeedPage() {
   let posts: PostWithDraft[] = [];
 
   if (subredditIds.length > 0) {
-    const { data } = await supabase
+    const { data, error: postsError } = await supabase
       .from("posts")
       .select("*, subreddits(name)")
       .in("subreddit_id", subredditIds)
       .order("rank_opportunity_score", { ascending: false })
       .limit(50);
+
+    console.log("[feed] subredditIds:", subredditIds.length, "posts:", data?.length ?? 0, "error:", postsError?.message ?? "none");
 
     if (data) {
       const postIds = data.map((p) => p.id);

@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { SubredditsClient } from "./subreddits-client";
 
+export const dynamic = "force-dynamic";
+
 export default async function SubredditsPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -12,11 +14,13 @@ export default async function SubredditsPage() {
     .eq("user_id", user.id)
     .order("created_at", { ascending: true });
 
-  const { data: userSubs } = await supabase
+  const { data: userSubs, error: subsError } = await supabase
     .from("user_subreddits")
     .select("id, active, profile_id, subreddits(id, name, display_name, subscriber_count, rules_structured, rules_fetched_at, last_scanned_at)")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
+
+  console.log("[subreddits] user:", user.id, "subs:", userSubs?.length ?? 0, "error:", subsError?.message ?? "none");
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-8">
