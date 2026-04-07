@@ -3,10 +3,13 @@ import type { Plan } from "@/lib/supabase/types";
 export interface PlanLimits {
   name: string;
   price: string;
-  subreddits: number;       // -1 = unlimited
-  draftsPerMonth: number;   // -1 = unlimited
+  subreddits: number;           // -1 = unlimited
+  draftsPerMonth: number;       // -1 = unlimited
   scanCadence: "manual" | "hourly" | "30min";
-  icpPerMonth: number;      // -1 = unlimited
+  icpPerMonth: number;          // -1 = unlimited
+  apifyBudgetUsd: number;       // monthly Apify spend cap per user
+  postsPerScan: number;         // posts to fetch per subreddit per scan
+  scanIntervalHours: number;    // minimum hours between scans
 }
 
 export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
@@ -17,6 +20,9 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     draftsPerMonth: 10,
     scanCadence: "manual",
     icpPerMonth: 100,
+    apifyBudgetUsd: 2,
+    postsPerScan: 10,
+    scanIntervalHours: 48,
   },
   starter: {
     name: "Starter",
@@ -25,6 +31,9 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     draftsPerMonth: 100,
     scanCadence: "hourly",
     icpPerMonth: 1000,
+    apifyBudgetUsd: 5,
+    postsPerScan: 10,
+    scanIntervalHours: 24,
   },
   growth: {
     name: "Growth",
@@ -33,6 +42,9 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     draftsPerMonth: 500,
     scanCadence: "30min",
     icpPerMonth: 5000,
+    apifyBudgetUsd: 15,
+    postsPerScan: 10,
+    scanIntervalHours: 48,
   },
   pro: {
     name: "Pro Agency",
@@ -41,6 +53,9 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     draftsPerMonth: -1,
     scanCadence: "30min",
     icpPerMonth: -1,
+    apifyBudgetUsd: 25,
+    postsPerScan: 10,
+    scanIntervalHours: 72,
   },
 };
 
