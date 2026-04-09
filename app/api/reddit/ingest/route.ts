@@ -113,6 +113,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (posts.length === 0) {
+    console.log(`[ingest] r/${subreddit.name} — Apify returned 0 usable posts. actualCost=$${actualCost}`);
     // Update last_scanned_at even if no posts, to prevent re-scanning
     await service
       .from("subreddits")
@@ -120,6 +121,8 @@ export async function POST(request: NextRequest) {
       .eq("id", subreddit.id);
     return NextResponse.json({ ingested: 0, cost: actualCost });
   }
+
+  console.log(`[ingest] r/${subreddit.name} — ingesting ${posts.length} posts`);
 
   const now = new Date().toISOString();
 

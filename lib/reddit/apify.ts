@@ -57,6 +57,14 @@ export async function fetchPostsViaApify(
 
   const { items } = await client.dataset(run.defaultDatasetId).listItems();
 
+  console.log(`[apify] run ${run.id} status=${run.status} items=${items.length}`);
+  if (items.length > 0) {
+    console.log(`[apify] first item keys:`, Object.keys(items[0]));
+    console.log(`[apify] first item sample:`, JSON.stringify(items[0]).slice(0, 500));
+  } else {
+    console.log(`[apify] no items returned — actor input:`, JSON.stringify({ startUrls, totalMaxItems }));
+  }
+
   // Transform Apify output to our format
   const posts: ApifyRedditPost[] = [];
   for (const item of items) {
