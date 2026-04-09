@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Rss, List, FileText, Settings, CreditCard, LogOut, Layers, ChevronLeft, ChevronRight, Menu, Shield } from "lucide-react";
+import { Rss, List, FileText, Settings, CreditCard, LogOut, Layers, ChevronLeft, ChevronRight, Menu, Shield, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 function NavItem({
@@ -66,6 +66,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [engagements, setEngagements] = useState<{ total: number; thisMonth: number } | null>(null);
 
   useEffect(() => {
     async function checkAdmin() {
@@ -75,7 +76,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       const { data } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single();
       if (data?.is_admin) setIsAdmin(true);
     }
+    async function fetchEngagements() {
+      const res = await fetch("/api/engagements/summary");
+      if (res.ok) {
+        const data = await res.json() as { total: number; thisMonth: number };
+        setEngagements(data);
+      }
+    }
     checkAdmin();
+    fetchEngagements();
   }, []);
 
   // Persist collapse state
@@ -125,6 +134,31 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         ))}
       </nav>
+
+      {/* Engagement stats */}
+      {engagements !== null && engagements.total > 0 && (
+        <div className={`border-t border-border ${collapsed ? "px-2 py-3" : "px-4 py-3"}`}>
+          {collapsed ? (
+            <div className="flex justify-center" title={`${engagements.total} engagements`}>
+              <Zap className="h-3.5 w-3.5 text-emerald-600" />
+            </div>
+          ) : (
+            <div>
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1">
+                <Zap className="h-3 w-3 text-emerald-600" />
+                Engagements
+              </p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-xl font-semibold tabular-nums">{engagements.total}</span>
+                <span className="text-[10px] text-muted-foreground">total</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                {engagements.thisMonth} this month
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Bottom: collapse toggle + logout */}
       <div className="border-t border-border p-2 space-y-0.5">

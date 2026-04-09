@@ -16,7 +16,10 @@ export async function PATCH(
 
   const updates: Record<string, unknown> = {};
   if (body.edited_text !== undefined) updates.edited_text = body.edited_text;
-  if (body.status !== undefined) updates.status = body.status;
+  if (body.status !== undefined) {
+    updates.status = body.status;
+    if (body.status === "posted") updates.posted_at = new Date().toISOString();
+  }
 
   const { data, error } = await supabase
     .from("reply_drafts")
