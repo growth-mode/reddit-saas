@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { ApifyClient } from "apify-client";
+
+const APIFY_BASE = "https://api.apify.com/v2";
+const ACTOR_ID = "trudax~reddit-scraper-lite";
 
 // GET /api/reddit/debug-scan?subreddit=entrepreneur
 // Returns raw Apify actor output so we can verify field names.
-// Remove or protect this endpoint after debugging.
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -12,38 +13,45 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const subredditName = searchParams.get("subreddit") || "entrepreneur";
+  const token = process.env.APIFY_API_TOKEN;
 
-  if (!process.env.APIFY_API_TOKEN) {
-    return NextResponse.json({ error: "APIFY_API_TOKEN not set" }, { status: 500 });
-  }
+  if (!token) return NextResponse.json({ error: "APIFY_API_TOKEN not set" }, { status: 500 });
 
-  const client = new ApifyClient({ token: process.env.APIFY_API_TOKEN });
-
-  try {
-    const run = await client.actor("trudax/reddit-scraper-lite").call(
-      {
+  const runRes = await fetch(
+    `${APIFY_BASE}/acts/${ACTOR_ID}/runs?token=${token}&waitForFinish=120`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
         startUrls: [{ url: `https://www.reddit.com/r/${subredditName}/new/` }],
         maxItems: 3,
         maxPostCount: 3,
         maxComments: 0,
         skipComments: true,
         proxy: { useApifyProxy: true },
-      },
-      { memory: 2048, timeout: 120 }
-    );
+        memory: 2048,
+      }),
+    }
+  );
 
-    const { items } = await client.dataset(run.defaultDatasetId).listItems();
-
-    return NextResponse.json({
-      runId: run.id,
-      status: run.status,
-      itemCount: items.length,
-      // Show keys from first item so we know the field names
-      firstItemKeys: items[0] ? Object.keys(items[0]) : [],
-      // Show first 2 raw items in full
-      rawItems: items.slice(0, 2),
-    });
-  } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+  if (!runRes.ok) {
+    const text = await runRes.text();
+    return NextResponse.json({ error: `Run failed ${runRes.status}: ${text.slice(0, 300)}` }, { status: 500 });
   }
+
+  const runData = (await runRes.json()) as { data: { id: string; status: string; defaultDatasetId: string } };
+  const run = runData.data;
+
+  const itemsRes = await fetch(
+    `${APIFY_BASE}/datasets/${run.defaultDatasetId}/items?token=${token}&format=json&limit=3`
+  );
+  const items = (await itemsRes.json()) as Record<string, unknown>[];
+
+  return NextResponse.json({
+    runId: run.id,
+    status: run.status,
+    itemCount: items.length,
+    firstItemKeys: items[0] ? Object.keys(items[0]) : [],
+    rawItems: items.slice(0, 2),
+  });
 }

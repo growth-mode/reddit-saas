@@ -1,8 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["apify-client"],
-  experimental: {
+experimental: {
     serverActions: {
       allowedOrigins: ["localhost:3001"],
     },
