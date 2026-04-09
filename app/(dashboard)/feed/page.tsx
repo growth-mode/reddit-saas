@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { FeedClient } from "./feed-client";
+import { getLimits } from "@/lib/limits";
+import type { Plan } from "@/lib/supabase/types";
 
 export const dynamic = "force-dynamic";
 
@@ -38,16 +40,27 @@ export interface FeedStats {
   thisMonth: number;
 }
 
+export interface ScanStatus {
+  lastScannedAt: string | null;   // ISO timestamp of most-recently-scanned subreddit
+  nextScanAt: string | null;      // ISO timestamp when next auto-scan is due
+  scanIntervalHours: number;
+  plan: Plan;
+  budgetExceeded: boolean;
+}
+
 export default async function FeedPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: userSubs, error: subsError } = await supabase
-    .from("user_subreddits")
-    .select("subreddit_id")
-    .eq("user_id", user.id)
-    .eq("active", true);
+  const [{ data: userSubs, error: subsError }, { data: profileData }] = await Promise.all([
+    supabase
+      .from("user_subreddits")
+      .select("subreddit_id, subreddits(last_scanned_at)")
+      .eq("user_id", user.id)
+      .eq("active", true),
+    supabase.from("profiles").select("plan, apify_spend_usd, apify_spend_reset_at").eq("id", user.id).single(),
+  ]);
 
   console.log("[feed] user:", user.id, "subs:", userSubs?.length ?? 0, "error:", subsError?.message ?? "none");
 
@@ -64,6 +77,47 @@ export default async function FeedPage() {
   }
 
   const subredditIds = (userSubs ?? []).map((s) => s.subreddit_id);
+
+  // Build scan status
+  const profile = profileData as unknown as {
+    plan: Plan;
+    apify_spend_usd: number;
+    apify_spend_reset_at: string;
+  } | null;
+  const plan: Plan = profile?.plan ?? "free";
+  const limits = getLimits(plan);
+  const resetAt = new Date(profile?.apify_spend_reset_at ?? 0);
+  const nowDate = new Date();
+  const isNewMonth =
+    nowDate.getMonth() !== resetAt.getMonth() ||
+    nowDate.getFullYear() !== resetAt.getFullYear();
+  const spend = isNewMonth ? 0 : Number(profile?.apify_spend_usd ?? 0);
+  const budgetExceeded = spend >= limits.apifyBudgetUsd;
+
+  // Find the most-recently scanned subreddit
+  const lastScannedAt = (userSubs ?? [])
+    .map((s) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sub = s.subreddits as any;
+      return sub?.last_scanned_at as string | null;
+    })
+    .filter(Boolean)
+    .sort()
+    .reverse()[0] ?? null;
+
+  const nextScanAt = lastScannedAt
+    ? new Date(
+        new Date(lastScannedAt).getTime() + limits.scanIntervalHours * 3600000
+      ).toISOString()
+    : null;
+
+  const scanStatus: ScanStatus = {
+    lastScannedAt,
+    nextScanAt,
+    scanIntervalHours: limits.scanIntervalHours,
+    plan,
+    budgetExceeded,
+  };
 
   let posts: PostWithDraft[] = [];
 
@@ -173,7 +227,7 @@ export default async function FeedPage() {
           </p>
         </div>
       ) : (
-        <FeedClient posts={posts} stats={stats} />
+        <FeedClient posts={posts} stats={stats} scanStatus={scanStatus} />
       )}
     </div>
   );

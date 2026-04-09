@@ -12,13 +12,14 @@ import {
   Copy,
   CheckCheck,
   Zap,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RiskBadge } from "@/components/reddit/risk-badge";
 import { SignalBadge } from "@/components/reddit/signal-badge";
 import { toast } from "sonner";
 import type { RiskScore } from "@/lib/supabase/types";
-import type { PostWithDraft, FeedStats } from "./page";
+import type { PostWithDraft, FeedStats, ScanStatus } from "./page";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -136,6 +137,58 @@ function RankReason({ signals }: { signals: Record<string, unknown> | null }) {
   );
 }
 
+// ── Scan status helper ─────────────────────────────────────────────────────────
+
+function ScanBar({
+  scanStatus,
+  onScan,
+  scanning,
+}: {
+  scanStatus: ScanStatus;
+  onScan: () => void;
+  scanning: boolean;
+}) {
+  const { lastScannedAt, nextScanAt, budgetExceeded } = scanStatus;
+
+  const lastText = lastScannedAt ? `Last scan ${timeAgo(lastScannedAt)}` : "Never scanned";
+
+  let nextText = "";
+  if (budgetExceeded) {
+    nextText = "Monthly budget reached";
+  } else if (nextScanAt) {
+    const msUntil = new Date(nextScanAt).getTime() - Date.now();
+    if (msUntil <= 0) {
+      nextText = "Auto-scan due";
+    } else {
+      const hUntil = Math.ceil(msUntil / 3600000);
+      nextText = `Auto-scan in ~${hUntil}h`;
+    }
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-3 mb-5 px-1">
+      <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+        <span>{lastText}</span>
+        {nextText && (
+          <>
+            <span className="text-border">·</span>
+            <span className={budgetExceeded ? "text-amber-600" : ""}>{nextText}</span>
+          </>
+        )}
+      </div>
+      <button
+        onClick={onScan}
+        disabled={scanning || budgetExceeded}
+        className="flex items-center gap-1.5 text-[11px] px-2.5 py-1.5 rounded-md border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        title={budgetExceeded ? "Monthly scan budget reached" : "Scan for new posts now"}
+      >
+        <RefreshCw className={`h-3 w-3 ${scanning ? "animate-spin" : ""}`} />
+        {scanning ? "Scanning…" : "Scan now"}
+      </button>
+    </div>
+  );
+}
+
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 type InboxStatus = "new" | "saved" | "bin";
@@ -153,9 +206,11 @@ interface ReplyPanel {
 export function FeedClient({
   posts,
   stats: initialStats,
+  scanStatus: initialScanStatus,
 }: {
   posts: PostWithDraft[];
   stats: FeedStats;
+  scanStatus: ScanStatus;
 }) {
   const [statusTab, setStatusTab] = useState<InboxStatus>("new");
   const [filter, setFilter] = useState<"all" | "high">("all");
@@ -170,6 +225,8 @@ export function FeedClient({
   const [panel, setPanel] = useState<ReplyPanel | null>(null);
   const [copied, setCopied] = useState(false);
   const [stats, setStats] = useState(initialStats);
+  const [scanStatus, setScanStatus] = useState(initialScanStatus);
+  const [scanning, setScanning] = useState(false);
 
   // ── Status actions ─────────────────────────────────────────────────────────
 
@@ -180,6 +237,33 @@ export function FeedClient({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ postId, status }),
     }).catch(() => toast.error("Failed to update status"));
+  }
+
+  // ── Scan ───────────────────────────────────────────────────────────────────
+
+  async function handleScan() {
+    setScanning(true);
+    const res = await fetch("/api/reddit/scan-all", { method: "POST" });
+    const data = await res.json() as { triggered?: number; skipped?: number; error?: string; budgetExceeded?: boolean };
+
+    if (res.status === 429 && data.budgetExceeded) {
+      toast.error(data.error ?? "Monthly scan budget reached");
+      setScanStatus((prev) => ({ ...prev, budgetExceeded: true }));
+    } else if (!res.ok) {
+      toast.error(data.error ?? "Scan failed");
+    } else {
+      const now = new Date().toISOString();
+      const nextAt = new Date(
+        Date.now() + scanStatus.scanIntervalHours * 3600000
+      ).toISOString();
+      setScanStatus((prev) => ({ ...prev, lastScannedAt: now, nextScanAt: nextAt }));
+      toast.success(
+        data.triggered === 0
+          ? "All subreddits scanned recently — no new scan needed"
+          : `Scanning ${data.triggered} subreddit${data.triggered !== 1 ? "s" : ""}… refresh in a minute`
+      );
+    }
+    setScanning(false);
   }
 
   // ── Reply panel ────────────────────────────────────────────────────────────
@@ -312,6 +396,9 @@ export function FeedClient({
           ))}
         </div>
       )}
+
+      {/* Scan status bar */}
+      <ScanBar scanStatus={scanStatus} onScan={handleScan} scanning={scanning} />
 
       {/* Inbox tabs */}
       <div className="flex items-center gap-1 mb-4">
