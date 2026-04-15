@@ -28,7 +28,7 @@ export function estimateScanCost(subredditCount: number, postsPerSub: number): n
 /** Fetch posts from multiple subreddits via Apify REST API */
 export async function fetchPostsViaApify(
   subreddits: { name: string; postsPerSub: number }[]
-): Promise<{ posts: ApifyRedditPost[]; actualCost: number }> {
+): Promise<{ posts: ApifyRedditPost[]; actualCost: number; rawReturned: number }> {
   const token = process.env.APIFY_API_TOKEN;
   if (!token) throw new Error("APIFY_API_TOKEN not set");
 
@@ -38,6 +38,10 @@ export async function fetchPostsViaApify(
   const totalMaxItems = subreddits.reduce((sum, s) => sum + s.postsPerSub, 0);
 
   // Start run and wait up to 120s for it to finish
+  // NOTE: `sort: "new"` forces the actor to use /new ordering regardless of
+  // the startUrl path — the actor has been observed to fall back to /hot
+  // when `sort` is unset, which was causing the same posts to return across
+  // scans and hiding fresh content behind dedup.
   const runRes = await fetch(
     `${APIFY_BASE}/acts/${ACTOR_ID}/runs?token=${token}&waitForFinish=120`,
     {
@@ -45,6 +49,7 @@ export async function fetchPostsViaApify(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         startUrls,
+        sort: "new",
         maxItems: totalMaxItems,
         maxPostCount: totalMaxItems,
         maxComments: 0,
@@ -139,6 +144,8 @@ export async function fetchPostsViaApify(
     });
   }
 
-  const actualCost = posts.length * COST_PER_RESULT + COST_PER_START;
-  return { posts, actualCost };
+  // Cost is based on items the actor actually returned (pre-filter), not
+  // posts we kept after removing [deleted]/AutoModerator/etc.
+  const actualCost = items.length * COST_PER_RESULT + COST_PER_START;
+  return { posts, actualCost, rawReturned: items.length };
 }

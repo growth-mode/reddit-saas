@@ -62,9 +62,12 @@ export async function POST(_request: NextRequest) {
   }
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  let triggered = 0;
-  let skipped = 0;
   const nowMs = Date.now();
+
+  // Partition subs into "scan now" vs. "skipped (scanned recently)" up front
+  // so we can parallelize the ingests and aggregate real insert counts.
+  const toScan: string[] = [];
+  let skipped = 0;
 
   for (const us of userSubs) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -78,16 +81,59 @@ export async function POST(_request: NextRequest) {
       skipped++;
       continue;
     }
-
-    // Fire ingest (non-blocking per subreddit)
-    await fetch(`${baseUrl}/api/reddit/ingest`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ subredditId: us.subreddit_id, userId: user.id }),
-    });
-
-    triggered++;
+    toScan.push(us.subreddit_id);
   }
 
-  return NextResponse.json({ triggered, skipped });
+  // Fire ingests in parallel and collect per-sub counts so the UI can show
+  // "X new posts" instead of the misleading "Scanning N subs…" with no
+  // follow-up — which was hiding 0-insert runs behind the green toast.
+  const results = await Promise.allSettled(
+    toScan.map((subredditId) =>
+      fetch(`${baseUrl}/api/reddit/ingest`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subredditId, userId: user.id }),
+      }).then((r) =>
+        r.json() as Promise<{
+          inserted?: number;
+          duplicates?: number;
+          returned?: number;
+          cached?: boolean;
+          cost?: number;
+          error?: string;
+        }>
+      )
+    )
+  );
+
+  let inserted = 0;
+  let duplicates = 0;
+  let cached = 0;
+  let failed = 0;
+  let cost = 0;
+
+  for (const r of results) {
+    if (r.status === "rejected") {
+      failed++;
+      continue;
+    }
+    const v = r.value;
+    if (v.error) {
+      failed++;
+      continue;
+    }
+    if (v.cached) cached++;
+    inserted += v.inserted ?? 0;
+    duplicates += v.duplicates ?? 0;
+    cost += v.cost ?? 0;
+  }
+
+  return NextResponse.json({
+    triggered: toScan.length,
+    skipped: skipped + cached, // both mean "didn't run a fresh scan"
+    inserted,
+    duplicates,
+    failed,
+    cost,
+  });
 }

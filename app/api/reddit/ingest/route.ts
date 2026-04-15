@@ -84,12 +84,19 @@ export async function POST(request: NextRequest) {
   if (subCheck?.last_scanned_at) {
     const hoursSince = (Date.now() - new Date(subCheck.last_scanned_at).getTime()) / 3600000;
     if (hoursSince < 1) {
-      return NextResponse.json({ ingested: 0, cached: true, message: "Scanned recently" });
+      return NextResponse.json({
+        ingested: 0,
+        inserted: 0,
+        duplicates: 0,
+        returned: 0,
+        cached: true,
+        message: "Scanned recently",
+      });
     }
   }
 
   // Fetch via Apify
-  const { posts, actualCost } = await fetchPostsViaApify([
+  const { posts, actualCost, rawReturned } = await fetchPostsViaApify([
     { name: subreddit.name, postsPerSub: postsPerScan },
   ]);
 
@@ -113,57 +120,86 @@ export async function POST(request: NextRequest) {
   }
 
   if (posts.length === 0) {
-    console.log(`[ingest] r/${subreddit.name} — Apify returned 0 usable posts. actualCost=$${actualCost}`);
+    console.log(
+      `[ingest] r/${subreddit.name} — Apify returned 0 usable posts ` +
+      `(raw=${rawReturned}, cost=$${actualCost.toFixed(3)})`
+    );
     // Update last_scanned_at even if no posts, to prevent re-scanning
     await service
       .from("subreddits")
       .update({ last_scanned_at: new Date().toISOString() })
       .eq("id", subreddit.id);
-    return NextResponse.json({ ingested: 0, cost: actualCost });
+    return NextResponse.json({
+      ingested: 0,
+      inserted: 0,
+      duplicates: 0,
+      returned: rawReturned,
+      cost: actualCost,
+    });
   }
-
-  console.log(`[ingest] r/${subreddit.name} — ingesting ${posts.length} posts`);
 
   const now = new Date().toISOString();
 
-  const rows = posts
-    .filter((p) => p.subreddit.toLowerCase() === subreddit.name.toLowerCase() || true)
-    .map((p) => {
-      const rankResult = computeRankScore(
-        p.title,
-        subreddit.name,
-        p.score,
-        p.num_comments,
-        p.created_utc
-      );
+  const rows = posts.map((p) => {
+    const rankResult = computeRankScore(
+      p.title,
+      subreddit.name,
+      p.score,
+      p.num_comments,
+      p.created_utc
+    );
 
-      return {
-        subreddit_id: subreddit.id,
-        reddit_id: p.reddit_id,
-        reddit_url: p.reddit_url,
-        title: p.title,
-        body: p.body,
-        author: p.author,
-        score: p.score,
-        num_comments: p.num_comments,
-        flair: p.flair,
-        created_utc: p.created_utc
-          ? new Date(p.created_utc * 1000).toISOString()
-          : now,
-        rank_opportunity_score: rankResult.score,
-        rank_signals: rankResult.signals as unknown as Record<string, unknown>,
-        rank_scored_at: now,
-      };
-    });
+    return {
+      subreddit_id: subreddit.id,
+      reddit_id: p.reddit_id,
+      reddit_url: p.reddit_url,
+      title: p.title,
+      body: p.body,
+      author: p.author,
+      score: p.score,
+      num_comments: p.num_comments,
+      flair: p.flair,
+      created_utc: p.created_utc
+        ? new Date(p.created_utc * 1000).toISOString()
+        : now,
+      rank_opportunity_score: rankResult.score,
+      rank_signals: rankResult.signals as unknown as Record<string, unknown>,
+      rank_scored_at: now,
+    };
+  });
 
-  const { error } = await service
+  // Two-step insert so we get accurate inserted / duplicate counts — the
+  // previous `upsert(ignoreDuplicates: true)` hid the fact that the same
+  // posts were coming back every scan, making it look like ingest was
+  // healthy when 0 new rows were landing.
+  const redditIds = rows.map((r) => r.reddit_id);
+  const { data: existing } = await service
     .from("posts")
-    .upsert(rows, { onConflict: "reddit_id", ignoreDuplicates: true });
+    .select("reddit_id")
+    .in("reddit_id", redditIds);
 
-  if (error) {
-    console.error("Error inserting posts:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  const existingIds = new Set((existing ?? []).map((r) => r.reddit_id as string));
+  const newRows = rows.filter((r) => !existingIds.has(r.reddit_id));
+  const duplicates = rows.length - newRows.length;
+
+  let inserted = 0;
+  if (newRows.length > 0) {
+    const { error, count } = await service
+      .from("posts")
+      .insert(newRows, { count: "exact" });
+
+    if (error) {
+      console.error("Error inserting posts:", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    inserted = count ?? newRows.length;
   }
+
+  console.log(
+    `[ingest] r/${subreddit.name} — ` +
+    `raw=${rawReturned} parsed=${rows.length} inserted=${inserted} duplicates=${duplicates} ` +
+    `cost=$${actualCost.toFixed(3)}`
+  );
 
   // Update scan timestamp
   await service
@@ -171,16 +207,24 @@ export async function POST(request: NextRequest) {
     .update({ last_scanned_at: new Date().toISOString() })
     .eq("id", subreddit.id);
 
-  // Fire ICP classification
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  await fetch(`${baseUrl}/api/icp/batch`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify({ subredditId: subreddit.id }),
-  }).catch(() => {});
+  // Fire ICP classification only when there's something new to classify
+  if (inserted > 0) {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    await fetch(`${baseUrl}/api/icp/batch`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.CRON_SECRET}`,
+      },
+      body: JSON.stringify({ subredditId: subreddit.id }),
+    }).catch(() => {});
+  }
 
-  return NextResponse.json({ ingested: rows.length, cost: actualCost });
+  return NextResponse.json({
+    ingested: inserted, // kept for back-compat with any callers reading this
+    inserted,
+    duplicates,
+    returned: rawReturned,
+    cost: actualCost,
+  });
 }

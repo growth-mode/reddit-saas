@@ -244,7 +244,15 @@ export function FeedClient({
   async function handleScan() {
     setScanning(true);
     const res = await fetch("/api/reddit/scan-all", { method: "POST" });
-    const data = await res.json() as { triggered?: number; skipped?: number; error?: string; budgetExceeded?: boolean };
+    const data = await res.json() as {
+      triggered?: number;
+      skipped?: number;
+      inserted?: number;
+      duplicates?: number;
+      failed?: number;
+      error?: string;
+      budgetExceeded?: boolean;
+    };
 
     if (res.status === 429 && data.budgetExceeded) {
       toast.error(data.error ?? "Monthly scan budget reached");
@@ -257,11 +265,38 @@ export function FeedClient({
         Date.now() + scanStatus.scanIntervalHours * 3600000
       ).toISOString();
       setScanStatus((prev) => ({ ...prev, lastScannedAt: now, nextScanAt: nextAt }));
-      toast.success(
-        data.triggered === 0
-          ? "All subreddits scanned recently — no new scan needed"
-          : `Scanning ${data.triggered} subreddit${data.triggered !== 1 ? "s" : ""}… refresh in a minute`
-      );
+
+      const triggered = data.triggered ?? 0;
+      const inserted = data.inserted ?? 0;
+      const duplicates = data.duplicates ?? 0;
+      const skipped = data.skipped ?? 0;
+      const failed = data.failed ?? 0;
+
+      if (triggered === 0) {
+        // All subs were skipped (cached or within 1h window)
+        toast.info(
+          skipped > 0
+            ? `All ${skipped} subreddit${skipped !== 1 ? "s" : ""} scanned recently — try again in an hour`
+            : "Nothing to scan"
+        );
+      } else if (inserted > 0) {
+        // Real new content landed — show counts + offer refresh
+        const parts = [`${inserted} new post${inserted !== 1 ? "s" : ""}`];
+        if (duplicates > 0) parts.push(`${duplicates} already seen`);
+        if (failed > 0) parts.push(`${failed} failed`);
+        toast.success(
+          `Scanned ${triggered} subreddit${triggered !== 1 ? "s" : ""}: ${parts.join(", ")}`,
+          {
+            action: { label: "Refresh", onClick: () => window.location.reload() },
+          }
+        );
+      } else {
+        // Scan ran but Reddit had nothing new — useful signal, not an error
+        toast.info(
+          `Scanned ${triggered} subreddit${triggered !== 1 ? "s" : ""} — no new posts found` +
+            (duplicates > 0 ? ` (${duplicates} already in feed)` : "")
+        );
+      }
     }
     setScanning(false);
   }

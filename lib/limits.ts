@@ -13,6 +13,12 @@ export interface PlanLimits {
 }
 
 export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
+  // NOTE: postsPerScan is sized proportional to scanIntervalHours so we
+  // actually cover the gap between scans on busy subs (a popular sub can
+  // produce 20+ posts/hour — fetching 10 for a 48h window guaranteed misses
+  // ~99% of the window and collided with dedup to look like "no new content").
+  // apifyBudgetUsd bumped accordingly. Math per plan is in a comment beside
+  // each entry: scans/mo × (postsPerScan × $0.004 + $0.04 start fee).
   free: {
     name: "Free",
     price: "$0",
@@ -20,8 +26,9 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     draftsPerMonth: 10,
     scanCadence: "manual",
     icpPerMonth: 100,
-    apifyBudgetUsd: 2,
-    postsPerScan: 10,
+    // 2 subs × 30 scans/mo × (25 × 0.004 + 0.04) = ~$8.40/mo cap
+    apifyBudgetUsd: 10,
+    postsPerScan: 25,
     scanIntervalHours: 48,
   },
   starter: {
@@ -31,8 +38,9 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     draftsPerMonth: 100,
     scanCadence: "hourly",
     icpPerMonth: 1000,
-    apifyBudgetUsd: 5,
-    postsPerScan: 10,
+    // 5 subs × 30 scans/mo × (30 × 0.004 + 0.04) = ~$24/mo cap
+    apifyBudgetUsd: 25,
+    postsPerScan: 30,
     scanIntervalHours: 24,
   },
   growth: {
@@ -42,8 +50,9 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     draftsPerMonth: 500,
     scanCadence: "30min",
     icpPerMonth: 5000,
-    apifyBudgetUsd: 15,
-    postsPerScan: 10,
+    // 20 subs × 15 scans/mo × (50 × 0.004 + 0.04) = ~$72/mo cap
+    apifyBudgetUsd: 75,
+    postsPerScan: 50,
     scanIntervalHours: 48,
   },
   pro: {
@@ -53,8 +62,9 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     draftsPerMonth: -1,
     scanCadence: "30min",
     icpPerMonth: -1,
-    apifyBudgetUsd: 25,
-    postsPerScan: 10,
+    // Assume 50 subs × 10 scans/mo × (75 × 0.004 + 0.04) = ~$170/mo cap
+    apifyBudgetUsd: 175,
+    postsPerScan: 75,
     scanIntervalHours: 72,
   },
 };
