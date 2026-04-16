@@ -102,11 +102,35 @@ export function SubredditsClient({
 
     if (error) {
       toast.error(error.message);
-    } else {
-      toast.success(`r/${name} added`);
-      if (!subredditName) setInput("");
-      router.refresh();
+      if (!subredditName) setAdding(false);
+      return false;
     }
+
+    toast.success(`r/${name} added — fetching recent posts…`);
+    if (!subredditName) setInput("");
+
+    // Kick off a first-scan backfill so the user's feed has content
+    // immediately instead of waiting up to 48h for the cron. The ingest
+    // route auto-detects last_scanned_at IS NULL and fetches a bigger batch.
+    fetch("/api/reddit/ingest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subredditId: subreddit.id, userId }),
+    })
+      .then((res) => res.json() as Promise<{ inserted?: number; error?: string }>)
+      .then((data) => {
+        if (data.error) {
+          toast.error(`r/${name}: ${data.error}`);
+        } else if ((data.inserted ?? 0) > 0) {
+          toast.success(`r/${name}: ${data.inserted} posts added to your feed`);
+        }
+        router.refresh();
+      })
+      .catch(() => {
+        // Non-fatal — cron will pick it up on the next run
+        router.refresh();
+      });
+
     if (!subredditName) setAdding(false);
     return true;
   }

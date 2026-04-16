@@ -29,6 +29,36 @@ export async function POST(request: NextRequest) {
 
   if (!subreddit) return NextResponse.json({ error: "Subreddit not found" }, { status: 404 });
 
+  // Check if subreddit was recently scanned (avoid duplicate scans). This
+  // needs to happen before the budget check so we know whether to size
+  // the scan as a first-scan backfill or a routine top-up.
+  const { data: subCheck } = await service
+    .from("subreddits")
+    .select("last_scanned_at")
+    .eq("id", subredditId)
+    .single();
+
+  // First-scan detection: when last_scanned_at is NULL this is the sub's
+  // debut in the system, so we pull a bigger batch to populate the feed
+  // immediately. Without this new users wait up to 48h for the cron to
+  // fire before seeing anything — guaranteed churn.
+  const isFirstScan = !subCheck?.last_scanned_at;
+  const BACKFILL_POSTS = 100;
+
+  if (subCheck?.last_scanned_at) {
+    const hoursSince = (Date.now() - new Date(subCheck.last_scanned_at).getTime()) / 3600000;
+    if (hoursSince < 1) {
+      return NextResponse.json({
+        ingested: 0,
+        inserted: 0,
+        duplicates: 0,
+        returned: 0,
+        cached: true,
+        message: "Scanned recently",
+      });
+    }
+  }
+
   // Get the requesting user's plan for budget + post limits
   let plan: Plan = "free";
   let postsPerScan = 10;
@@ -62,9 +92,12 @@ export async function POST(request: NextRequest) {
         profile.apify_spend_usd = 0;
       }
 
-      // Check budget
+      // Check budget using the cost of THIS scan (bigger on first-scan)
       const currentSpend = Number(profile.apify_spend_usd ?? 0);
-      const estimatedCost = estimateScanCost(1, postsPerScan);
+      const postsThisScan = isFirstScan
+        ? Math.max(postsPerScan, BACKFILL_POSTS)
+        : postsPerScan;
+      const estimatedCost = estimateScanCost(1, postsThisScan);
       if (currentSpend + estimatedCost > limits.apifyBudgetUsd) {
         return NextResponse.json(
           { error: `Scan budget reached ($${currentSpend.toFixed(2)}/$${limits.apifyBudgetUsd} on ${limits.name} plan)` },
@@ -74,30 +107,17 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Check if subreddit was recently scanned (avoid duplicate scans)
-  const { data: subCheck } = await service
-    .from("subreddits")
-    .select("last_scanned_at")
-    .eq("id", subredditId)
-    .single();
+  const effectivePostsPerScan = isFirstScan
+    ? Math.max(postsPerScan, BACKFILL_POSTS)
+    : postsPerScan;
 
-  if (subCheck?.last_scanned_at) {
-    const hoursSince = (Date.now() - new Date(subCheck.last_scanned_at).getTime()) / 3600000;
-    if (hoursSince < 1) {
-      return NextResponse.json({
-        ingested: 0,
-        inserted: 0,
-        duplicates: 0,
-        returned: 0,
-        cached: true,
-        message: "Scanned recently",
-      });
-    }
+  if (isFirstScan) {
+    console.log(`[ingest] r/${subreddit.name} — first-scan backfill (${effectivePostsPerScan} posts)`);
   }
 
   // Fetch via Apify
   const { posts, actualCost, rawReturned } = await fetchPostsViaApify([
-    { name: subreddit.name, postsPerSub: postsPerScan },
+    { name: subreddit.name, postsPerSub: effectivePostsPerScan },
   ]);
 
   // Record spend

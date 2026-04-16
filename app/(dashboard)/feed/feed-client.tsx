@@ -13,6 +13,8 @@ import {
   CheckCheck,
   Zap,
   RefreshCw,
+  ThumbsUp,
+  ThumbsDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RiskBadge } from "@/components/reddit/risk-badge";
@@ -217,6 +219,9 @@ export function FeedClient({
   const [localStatuses, setLocalStatuses] = useState<Record<string, InboxStatus>>(
     () => Object.fromEntries(posts.map((p) => [p.id, p.post_status]))
   );
+  const [localFeedback, setLocalFeedback] = useState<Record<string, "up" | "down" | null>>(
+    () => Object.fromEntries(posts.map((p) => [p.id, p.feedback]))
+  );
   // Posts marked as posted disappear from all tabs
   const [postedIds, setPostedIds] = useState<Set<string>>(
     () => new Set(posts.filter((p) => p.draft?.status === "posted").map((p) => p.id))
@@ -237,6 +242,30 @@ export function FeedClient({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ postId, status }),
     }).catch(() => toast.error("Failed to update status"));
+  }
+
+  // Toggle feedback: clicking the currently-selected thumb clears it.
+  // The signal is fed back into the ICP classifier as few-shot examples
+  // on the next batch run, so the score personalises to the user's taste.
+  function setPostFeedback(postId: string, next: "up" | "down") {
+    const current = localFeedback[postId] ?? null;
+    const value = current === next ? null : next;
+    setLocalFeedback((prev) => ({ ...prev, [postId]: value }));
+    fetch("/api/posts/feedback", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ postId, feedback: value }),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error();
+        if (value === "up") toast.success("Thanks — we'll prioritise posts like this");
+        else if (value === "down") toast.success("Got it — we'll show fewer like this");
+      })
+      .catch(() => {
+        // Revert on failure
+        setLocalFeedback((prev) => ({ ...prev, [postId]: current }));
+        toast.error("Failed to save feedback");
+      });
   }
 
   // ── Scan ───────────────────────────────────────────────────────────────────
@@ -501,6 +530,7 @@ export function FeedClient({
         <div className="border border-border rounded-lg divide-y divide-border">
           {displayed.map((post) => {
             const status = localStatuses[post.id] ?? "new";
+            const feedback = localFeedback[post.id] ?? null;
             const isGenerating = generatingId === post.id;
 
             return (
@@ -541,9 +571,14 @@ export function FeedClient({
                       </p>
                     )}
                     {post.icp_summary && (
-                      <p className="text-xs text-muted-foreground mt-1 italic">
-                        {post.icp_summary}
-                      </p>
+                      // The "why this matched" line — pulled up visually so
+                      // users don't have to guess what the ICP score meant.
+                      <div className="mt-2 pl-2 border-l-2 border-primary/30 bg-primary/[0.03] py-1 pr-2 rounded-sm">
+                        <p className="text-xs text-foreground/80">
+                          <span className="text-primary font-medium">Match: </span>
+                          {post.icp_summary}
+                        </p>
+                      </div>
                     )}
                     <RankReason signals={post.rank_signals} />
 
@@ -588,6 +623,36 @@ export function FeedClient({
                         Draft reply
                       </Button>
                     )}
+
+                    {/* Feedback thumbs — trains the ICP classifier via few-shot examples. */}
+                    <div className="flex items-center gap-0.5">
+                      <button
+                        onClick={() => setPostFeedback(post.id, "up")}
+                        title={feedback === "up" ? "Remove thumbs up" : "Good match — more like this"}
+                        className={`p-1.5 rounded transition-colors ${
+                          feedback === "up"
+                            ? "text-primary bg-primary/10"
+                            : "text-muted-foreground hover:text-primary hover:bg-muted"
+                        }`}
+                      >
+                        <ThumbsUp
+                          className={`h-3.5 w-3.5 ${feedback === "up" ? "fill-current" : ""}`}
+                        />
+                      </button>
+                      <button
+                        onClick={() => setPostFeedback(post.id, "down")}
+                        title={feedback === "down" ? "Remove thumbs down" : "Bad match — fewer like this"}
+                        className={`p-1.5 rounded transition-colors ${
+                          feedback === "down"
+                            ? "text-destructive bg-destructive/10"
+                            : "text-muted-foreground hover:text-destructive hover:bg-muted"
+                        }`}
+                      >
+                        <ThumbsDown
+                          className={`h-3.5 w-3.5 ${feedback === "down" ? "fill-current" : ""}`}
+                        />
+                      </button>
+                    </div>
 
                     {/* Save / Bin actions */}
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

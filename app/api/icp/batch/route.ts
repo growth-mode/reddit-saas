@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { classifyPost } from "@/lib/ai/icp-classifier";
+import { classifyPost, type FeedbackExample } from "@/lib/ai/icp-classifier";
 
 export const maxDuration = 300;
 
@@ -54,6 +54,29 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ classified: 0, reason: "No user config found" });
   }
 
+  // Fetch the user's most recent 👍/👎 feedback so the classifier can
+  // personalise to their real judgment. post_interactions isn't in the
+  // generated types, so this goes via a raw query cast.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: feedbackRows } = await (service as any)
+    .from("post_interactions")
+    .select("feedback, posts(title, body)")
+    .eq("user_id", userId)
+    .not("feedback", "is", null)
+    .order("updated_at", { ascending: false })
+    .limit(20);
+
+  const examples: FeedbackExample[] = ((feedbackRows ?? []) as Array<{
+    feedback: "up" | "down";
+    posts: { title: string; body: string | null } | null;
+  }>)
+    .filter((r) => r.posts?.title)
+    .map((r) => ({
+      title: r.posts!.title,
+      body: r.posts!.body ?? "",
+      verdict: r.feedback === "up" ? "good" : "bad",
+    }));
+
   let classified = 0;
 
   for (const post of posts) {
@@ -63,7 +86,8 @@ export async function POST(request: NextRequest) {
         post.title,
         post.body,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (post.top_comments as any[]) ?? []
+        (post.top_comments as any[]) ?? [],
+        examples
       );
 
       await service

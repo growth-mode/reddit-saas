@@ -31,6 +31,7 @@ export interface PostWithDraft {
   subreddit_name: string;
   created_utc: string | number;
   post_status: "new" | "saved" | "bin";
+  feedback: "up" | "down" | null;
   draft: PostDraft | null;
 }
 
@@ -144,7 +145,7 @@ export default async function FeedPage() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (supabase as any)
           .from("post_interactions")
-          .select("post_id, status")
+          .select("post_id, status, feedback")
           .eq("user_id", user.id)
           .in("post_id", postIds),
       ]);
@@ -156,12 +157,17 @@ export default async function FeedPage() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (interactions ?? []).map((i: any) => [i.post_id, i.status as "new" | "saved" | "bin"])
       );
+      const feedbackMap = new Map<string, "up" | "down" | null>(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (interactions ?? []).map((i: any) => [i.post_id, (i.feedback ?? null) as "up" | "down" | null])
+      );
 
       posts = data.map((p) => ({
         ...p,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         subreddit_name: (p.subreddits as any)?.name ?? "unknown",
         post_status: statusMap.get(p.id) ?? "new",
+        feedback: feedbackMap.get(p.id) ?? null,
         draft: draftMap.get(p.id) ?? null,
       }));
     }

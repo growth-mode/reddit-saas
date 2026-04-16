@@ -10,6 +10,15 @@ export interface IcpClassification {
   summary: string;
 }
 
+// Few-shot examples drawn from the user's thumbs-up / thumbs-down history.
+// Feeding these into the prompt personalises the classifier to each user's
+// real judgment without any ML infra — the last 20 👍/👎 capture drift.
+export interface FeedbackExample {
+  title: string;
+  body: string;
+  verdict: "good" | "bad";
+}
+
 const SIGNAL_DEFINITIONS = `
 - tool_seeking: Post explicitly asks for tool, software, or service recommendations
 - frustration: Post describes pain with current workflow, tool, or process
@@ -19,16 +28,41 @@ const SIGNAL_DEFINITIONS = `
 - advice_seeking: Post asks for expert advice from practitioners in your space
 `.trim();
 
+function formatExamples(examples: FeedbackExample[]): string {
+  if (examples.length === 0) return "";
+  const good = examples.filter((e) => e.verdict === "good").slice(0, 8);
+  const bad = examples.filter((e) => e.verdict === "bad").slice(0, 8);
+
+  const lines: string[] = [];
+  if (good.length > 0) {
+    lines.push("Examples the user marked as GOOD matches (thumbs up — aim for scores ≥70):");
+    for (const ex of good) {
+      lines.push(`- "${ex.title}"${ex.body ? ` — ${ex.body.slice(0, 160)}` : ""}`);
+    }
+  }
+  if (bad.length > 0) {
+    lines.push("");
+    lines.push("Examples the user marked as BAD matches (thumbs down — aim for scores ≤30):");
+    for (const ex of bad) {
+      lines.push(`- "${ex.title}"${ex.body ? ` — ${ex.body.slice(0, 160)}` : ""}`);
+    }
+  }
+  return lines.join("\n");
+}
+
 export async function classifyPost(
   config: UserConfig,
   title: string,
   body: string,
-  topComments: RedditComment[]
+  topComments: RedditComment[],
+  examples: FeedbackExample[] = []
 ): Promise<IcpClassification> {
   const commentsPreview = topComments
     .slice(0, 3)
     .map((c) => `• ${c.author}: ${c.body.slice(0, 200)}`)
     .join("\n");
+
+  const examplesBlock = formatExamples(examples);
 
   const systemPrompt = `You are an ICP (Ideal Customer Profile) classifier for a SaaS product.
 Determine whether a Reddit post represents a buying signal or conversion opportunity.
@@ -40,7 +74,7 @@ Keywords: ${config.keywords.join(", ") || "N/A"}
 Pain points: ${config.pain_points.join(", ") || "N/A"}
 
 Signal definitions:
-${SIGNAL_DEFINITIONS}
+${SIGNAL_DEFINITIONS}${examplesBlock ? `\n\n${examplesBlock}` : ""}
 
 Return ONLY valid JSON — no markdown, no explanation:
 {
